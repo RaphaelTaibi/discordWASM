@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from './hooks/useAuth';
+import { useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { StreamProvider } from './context/StreamContext';
 import { VoiceProvider, useVoiceStore } from './context/VoiceContext';
 import { LoginView } from "./components/auth/LoginView";
@@ -7,7 +7,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { StreamCard } from './components/stream/StreamCard';
 import { VoiceAudioRenderer } from './components/stream/VoiceAudioRenderer';
 import { useStreamStore } from './context/StreamContext';
-import { Hash, Headphones, LogOut, Mic, MicOff, Monitor, PhoneOff, Settings, Volume2, VolumeX } from 'lucide-react';
+import { Hash, Headphones, LogOut, Mic, MicOff, Monitor, PhoneOff, Settings, Volume2 } from 'lucide-react';
 
 const Dashboard = () => {
     const { username, logout } = useAuth();
@@ -17,16 +17,17 @@ const Dashboard = () => {
         participants,
         isConnected,
         isMuted,
+        isDeafened,
         error,
         joinChannel,
         leaveChannel,
         toggleMute,
+        toggleDeafen,
         remoteStreams,
         remoteVideoStreams,
         addScreenTrack,
         removeScreenTrack,
     } = useVoiceStore();
-    const [isDeafened, setIsDeafened] = useState(false);
 
     // Bridge screen share to WebRTC peer connections
     useEffect(() => {
@@ -45,21 +46,13 @@ const Dashboard = () => {
         { id: 'me', username: safeUsername, live: true },
         ...participants
             .filter((member) => member.username !== safeUsername)
-            .slice(0, 3)
             .map((member) => ({ id: member.userId, username: member.username, live: false })),
     ];
 
-    while (stageCards.length < 4) {
-        stageCards.push({ id: `empty-${stageCards.length}`, username: 'Slot libre', live: false });
-    }
 
     const handleLogout = () => {
         leaveChannel();
         logout();
-    };
-
-    const toggleDeafen = () => {
-        setIsDeafened((prev) => !prev);
     };
 
     return (
@@ -94,7 +87,6 @@ const Dashboard = () => {
                     participants={participants}
                     isConnected={isConnected}
                     channelId={channelId}
-                    isMuted={isMuted}
                 />
             }
             footer={
@@ -118,7 +110,11 @@ const Dashboard = () => {
                 />
             }
         >
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${
+                stageCards.length === 1 ? 'grid-cols-1' :
+                stageCards.length <= 4 ? 'grid-cols-1 xl:grid-cols-2' :
+                'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+            }`}>
                 {stageCards.map((card) => {
                     if (card.id === 'me') {
                         return (
@@ -169,7 +165,7 @@ const Dashboard = () => {
                     );
                 })}
 
-                <div className="xl:col-span-2 rounded-lg bg-[#232428] border border-black/20 p-4">
+                <div className="col-span-full rounded-lg bg-[#232428] border border-black/20 p-4">
                     <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wide mb-2">Activite vocale</h3>
                     <p className="text-gray-400 text-sm mb-1">
                         {isConnected ? `Connecte au salon ${channelId}` : 'Pas encore connecte a un salon vocal'}
@@ -305,12 +301,10 @@ const MembersPanel = ({
     participants,
     isConnected,
     channelId,
-    isMuted,
 }: {
-    participants: { userId: string; username: string }[];
+    participants: { userId: string; username: string; isMuted?: boolean; isDeafened?: boolean }[];
     isConnected: boolean;
     channelId: string | null;
-    isMuted: boolean;
 }) => (
     <div className="h-full flex flex-col">
         <div className="h-12 px-4 flex items-center border-b border-black/20 text-sm font-semibold text-gray-200">
@@ -323,18 +317,30 @@ const MembersPanel = ({
             {participants.length === 0 && (
                 <div className="text-xs text-gray-500">Personne dans le salon pour le moment.</div>
             )}
-            {participants.map((member) => (
-                <div key={member.userId} className="flex items-center gap-2 bg-[#35373c] rounded-md px-3 py-2">
-                    <div className="w-7 h-7 rounded-full bg-[#5865f2] text-white text-xs font-bold flex items-center justify-center">
-                        {member.username.slice(0, 1).toUpperCase()}
+            {participants.map((member) => {
+                const memberMuted = !!member.isMuted;
+                const memberDeafened = !!member.isDeafened;
+
+                return (
+                    <div key={member.userId} className="flex items-center gap-2 bg-[#35373c] rounded-md px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-[#5865f2] text-white text-xs font-bold flex items-center justify-center">
+                            {member.username.slice(0, 1).toUpperCase()}
+                        </div>
+                        <span className="text-sm text-gray-100 truncate flex-1">{member.username}</span>
+                        <div className="inline-flex items-center gap-1">
+                            {memberDeafened && (
+                                <span className="text-[10px] uppercase font-bold text-orange-300 inline-flex items-center gap-0.5">
+                                    <Headphones size={12} />
+                                </span>
+                            )}
+                            <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold ${memberMuted ? 'text-red-300' : 'text-green-300'}`}>
+                                {memberMuted ? <MicOff size={12} /> : <Volume2 size={12} />}
+                                {memberMuted ? 'Mute' : 'Live'}
+                            </span>
+                        </div>
                     </div>
-                    <span className="text-sm text-gray-100 truncate flex-1">{member.username}</span>
-                    <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold ${isMuted ? 'text-red-300' : 'text-green-300'}`}>
-                        {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
-                        {isMuted ? 'Mute' : 'Live'}
-                    </span>
-                </div>
-            ))}
+                );
+            })}
         </div>
     </div>
 );
@@ -466,13 +472,18 @@ const BottomActions = ({
 );
 
 export default function App() {
-    const { isAuthenticated, login } = useAuth();
-
     return (
-        <VoiceProvider>
-            <StreamProvider>
-                {isAuthenticated ? <Dashboard /> : <LoginView onLogin={login} />}
-            </StreamProvider>
-        </VoiceProvider>
+        <AuthProvider>
+            <VoiceProvider>
+                <StreamProvider>
+                    <AppContent />
+                </StreamProvider>
+            </VoiceProvider>
+        </AuthProvider>
     );
+}
+
+function AppContent() {
+    const { isAuthenticated, login } = useAuth();
+    return isAuthenticated ? <Dashboard /> : <LoginView onLogin={login} />;
 }

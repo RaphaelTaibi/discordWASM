@@ -1,5 +1,8 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { ClientSignalMessage, ServerSignalMessage, VoicePeer, VoiceState } from '../types/voice.types';
+import { ClientSignalMessage } from '../types/clientSignal.type';
+import { ServerSignalMessage } from '../types/serverSignal.type';
+import VoicePeer from '../models/voicePeer.model';
+import VoiceState from '../models/voiceState.model';
 
 const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || 'ws://127.0.0.1:3001/ws';
 
@@ -27,6 +30,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     const [participants, setParticipants] = useState<VoicePeer[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
+    const [isDeafened, setIsDeafened] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
     const [remoteVideoStreams, setRemoteVideoStreams] = useState<Map<string, MediaStream>>(new Map());
@@ -238,6 +242,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         setRemoteVideoStreams(new Map());
         setIsConnected(false);
         setIsMuted(false);
+        setIsDeafened(false);
     }, [removePeerConnection, sendSignal]);
 
     const joinChannel = useCallback(async (nextChannelId: string, username: string) => {
@@ -320,6 +325,17 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
 
+                if (msg.type === 'peer-state') {
+                    setParticipants((prev) =>
+                        prev.map((p) =>
+                            p.userId === msg.userId
+                                ? { ...p, isMuted: msg.isMuted, isDeafened: msg.isDeafened }
+                                : p,
+                        ),
+                    );
+                    return;
+                }
+
                 if (msg.type === 'offer') {
                     await handleOffer(msg);
                     return;
@@ -360,7 +376,48 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
             track.enabled = !nextMuted;
         }
         setIsMuted(nextMuted);
-    }, [isMuted]);
+
+        // Update local participant state
+        setParticipants((prev) =>
+            prev.map((p) =>
+                p.userId === userIdRef.current ? { ...p, isMuted: nextMuted } : p,
+            ),
+        );
+
+        // Broadcast to other peers
+        if (channelIdRef.current) {
+            sendSignal({
+                type: 'media-state',
+                channelId: channelIdRef.current,
+                userId: userIdRef.current,
+                isMuted: nextMuted,
+                isDeafened,
+            });
+        }
+    }, [isMuted, isDeafened, sendSignal]);
+
+    const toggleDeafen = useCallback(() => {
+        const nextDeafened = !isDeafened;
+        setIsDeafened(nextDeafened);
+
+        // Update local participant state
+        setParticipants((prev) =>
+            prev.map((p) =>
+                p.userId === userIdRef.current ? { ...p, isDeafened: nextDeafened } : p,
+            ),
+        );
+
+        // Broadcast to other peers
+        if (channelIdRef.current) {
+            sendSignal({
+                type: 'media-state',
+                channelId: channelIdRef.current,
+                userId: userIdRef.current,
+                isMuted,
+                isDeafened: nextDeafened,
+            });
+        }
+    }, [isMuted, isDeafened, sendSignal]);
 
     const renegotiateWithPeer = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
         if (!channelIdRef.current) return;
@@ -409,15 +466,17 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         participants,
         isConnected,
         isMuted,
+        isDeafened,
         error,
         joinChannel,
         leaveChannel,
         toggleMute,
+        toggleDeafen,
         remoteStreams,
         remoteVideoStreams,
         addScreenTrack,
         removeScreenTrack,
-    }), [channelId, participants, isConnected, isMuted, error, joinChannel, leaveChannel, toggleMute, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack]);
+    }), [channelId, participants, isConnected, isMuted, isDeafened, error, joinChannel, leaveChannel, toggleMute, toggleDeafen, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack]);
 
     return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
 };

@@ -5,10 +5,12 @@ export default interface VoiceState {
     participants: VoicePeer[];
     isConnected: boolean;
     isMuted: boolean;
+    isDeafened: boolean;
     error: string | null;
     joinChannel: (channelId: string, username: string) => Promise<void>;
     leaveChannel: () => void;
     toggleMute: () => void;
+    toggleDeafen: () => void;
     remoteStreams: Map<string, MediaStream>;
     remoteVideoStreams: Map<string, MediaStream>;
     addScreenTrack: (stream: MediaStream) => void;
