@@ -1,0 +1,19 @@
+# Rust - Le gros coupable
+/target/
+**/*.rs.bk
+
+# Node / JS
+node_modules/
+.env
+dist/
+
+# WASM
+pkg/
+
+# Tauri
+src-tauri/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp

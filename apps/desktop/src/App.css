@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Tes styles personnalisés en dessous si besoin */
+body {
+    margin: 0;
+    background-color: #1e1f22; /* Le noir Discord au cas où le chargement tarde */
+}
