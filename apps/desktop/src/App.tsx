@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { StreamProvider } from './context/StreamContext';
 import { VoiceProvider, useVoiceStore } from './context/VoiceContext';
@@ -22,8 +22,23 @@ const Dashboard = () => {
         leaveChannel,
         toggleMute,
         remoteStreams,
+        remoteVideoStreams,
+        addScreenTrack,
+        removeScreenTrack,
     } = useVoiceStore();
     const [isDeafened, setIsDeafened] = useState(false);
+
+    // Bridge screen share to WebRTC peer connections
+    useEffect(() => {
+        if (isStreaming && stream && isConnected) {
+            addScreenTrack(stream);
+        }
+        return () => {
+            if (!isStreaming) {
+                removeScreenTrack();
+            }
+        };
+    }, [isStreaming, stream, isConnected]);
 
     const safeUsername = username || 'Anonyme';
     const stageCards = [
@@ -87,7 +102,14 @@ const Dashboard = () => {
                     metricsLum={metrics.lum}
                     metricsStatus={metrics.status}
                     isStreaming={isStreaming}
-                    onToggleStream={isStreaming ? stopCapture : startCapture}
+                    onToggleStream={() => {
+                        if (isStreaming) {
+                            removeScreenTrack();
+                            stopCapture();
+                        } else {
+                            startCapture();
+                        }
+                    }}
                     isMuted={isMuted}
                     onToggleMute={toggleMute}
                     isDeafened={isDeafened}
@@ -115,6 +137,19 @@ const Dashboard = () => {
                                         <Headphones size={13} className="text-white" />
                                     </div>
                                 )}
+                            </div>
+                        );
+                    }
+
+                    const remoteVideo = remoteVideoStreams.get(card.id);
+
+                    if (remoteVideo) {
+                        return (
+                            <div key={card.id} className="relative">
+                                <StreamCard
+                                    stream={remoteVideo}
+                                    username={card.username}
+                                />
                             </div>
                         );
                     }

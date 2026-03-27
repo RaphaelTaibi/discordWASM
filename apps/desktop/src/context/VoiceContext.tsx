@@ -29,9 +29,11 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     const [isMuted, setIsMuted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+    const [remoteVideoStreams, setRemoteVideoStreams] = useState<Map<string, MediaStream>>(new Map());
 
     const socketRef = useRef<WebSocket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
+    const screenStreamRef = useRef<MediaStream | null>(null);
     const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
     const userIdRef = useRef<string>(buildUserId());
     const usernameRef = useRef<string>('Anonymous');
@@ -60,6 +62,12 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
             return next;
         });
 
+        setRemoteVideoStreams((prev) => {
+            const next = new Map(prev);
+            next.delete(peerId);
+            return next;
+        });
+
         setParticipants((prev) => prev.filter((peer) => peer.userId !== peerId));
     }, []);
 
@@ -71,10 +79,19 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
+        // Add audio tracks
         const localStream = localStreamRef.current;
         if (localStream) {
             for (const track of localStream.getTracks()) {
                 pc.addTrack(track, localStream);
+            }
+        }
+
+        // Add screen share video track if currently sharing
+        const screenStream = screenStreamRef.current;
+        if (screenStream) {
+            for (const track of screenStream.getVideoTracks()) {
+                pc.addTrack(track, screenStream);
             }
         }
 
@@ -98,11 +115,42 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            setRemoteStreams((prev) => {
-                const next = new Map(prev);
-                next.set(peer.userId, stream);
-                return next;
-            });
+            if (event.track.kind === 'audio') {
+                setRemoteStreams((prev) => {
+                    const next = new Map(prev);
+                    next.set(peer.userId, stream);
+                    return next;
+                });
+            } else if (event.track.kind === 'video') {
+                setRemoteVideoStreams((prev) => {
+                    const next = new Map(prev);
+                    next.set(peer.userId, stream);
+                    return next;
+                });
+
+                // Clean up when remote stops sharing
+                event.track.onended = () => {
+                    setRemoteVideoStreams((prev) => {
+                        const next = new Map(prev);
+                        next.delete(peer.userId);
+                        return next;
+                    });
+                };
+                event.track.onmute = () => {
+                    setRemoteVideoStreams((prev) => {
+                        const next = new Map(prev);
+                        next.delete(peer.userId);
+                        return next;
+                    });
+                };
+                event.track.onunmute = () => {
+                    setRemoteVideoStreams((prev) => {
+                        const next = new Map(prev);
+                        next.set(peer.userId, stream);
+                        return next;
+                    });
+                };
+            }
         };
 
         peerConnectionsRef.current.set(peer.userId, pc);
@@ -174,6 +222,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         }
 
         localStreamRef.current = null;
+        screenStreamRef.current = null;
         peerConnectionsRef.current.clear();
 
         const socket = socketRef.current;
@@ -186,6 +235,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         setChannelId(null);
         setParticipants([]);
         setRemoteStreams(new Map());
+        setRemoteVideoStreams(new Map());
         setIsConnected(false);
         setIsMuted(false);
     }, [removePeerConnection, sendSignal]);
@@ -312,6 +362,48 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         setIsMuted(nextMuted);
     }, [isMuted]);
 
+    const renegotiateWithPeer = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
+        if (!channelIdRef.current) return;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal({
+            type: 'offer',
+            channelId: channelIdRef.current,
+            from: userIdRef.current,
+            to: peerId,
+            sdp: offer,
+        });
+    }, [sendSignal]);
+
+    const addScreenTrack = useCallback((screenStream: MediaStream) => {
+        screenStreamRef.current = screenStream;
+        const videoTrack = screenStream.getVideoTracks()[0];
+        if (!videoTrack) return;
+
+        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+            // Don't add if already has a video sender with a track
+            const hasVideo = pc.getSenders().some((s) => s.track?.kind === 'video');
+            if (!hasVideo) {
+                pc.addTrack(videoTrack, screenStream);
+            }
+            renegotiateWithPeer(peerId, pc);
+        }
+    }, [renegotiateWithPeer]);
+
+    const removeScreenTrack = useCallback(() => {
+        screenStreamRef.current = null;
+
+        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+            const senders = pc.getSenders();
+            for (const sender of senders) {
+                if (sender.track?.kind === 'video') {
+                    pc.removeTrack(sender);
+                }
+            }
+            renegotiateWithPeer(peerId, pc);
+        }
+    }, [renegotiateWithPeer]);
+
     const value = useMemo<VoiceState>(() => ({
         channelId,
         participants,
@@ -322,7 +414,10 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         leaveChannel,
         toggleMute,
         remoteStreams,
-    }), [channelId, participants, isConnected, isMuted, error, joinChannel, leaveChannel, toggleMute, remoteStreams]);
+        remoteVideoStreams,
+        addScreenTrack,
+        removeScreenTrack,
+    }), [channelId, participants, isConnected, isMuted, error, joinChannel, leaveChannel, toggleMute, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack]);
 
     return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
 };

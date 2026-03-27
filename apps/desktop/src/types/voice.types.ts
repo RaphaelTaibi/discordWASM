@@ -47,5 +47,8 @@ export interface VoiceState {
     leaveChannel: () => void;
     toggleMute: () => void;
     remoteStreams: Map<string, MediaStream>;
+    remoteVideoStreams: Map<string, MediaStream>;
+    addScreenTrack: (stream: MediaStream) => void;
+    removeScreenTrack: () => void;
 }
 
