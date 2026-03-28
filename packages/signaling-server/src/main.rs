@@ -22,6 +22,8 @@ struct PeerSession {
     username: String,
     channel_id: String,
     tx: mpsc::UnboundedSender<String>,
+    is_muted: bool,
+    is_deafened: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,6 +126,8 @@ enum ServerMessage {
 struct PeerInfo {
     user_id: String,
     username: String,
+    is_muted: bool,
+    is_deafened: bool,
 }
 
 fn serialize_message(message: &ServerMessage) -> Option<String> {
@@ -280,6 +284,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             peers.get(member_id).map(|peer| PeerInfo {
                                 user_id: peer.user_id.clone(),
                                 username: peer.username.clone(),
+                                is_muted: peer.is_muted,
+                                is_deafened: peer.is_deafened,
                             })
                         })
                         .collect::<Vec<_>>()
@@ -294,6 +300,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             username: username.clone(),
                             channel_id: channel_id.clone(),
                             tx: tx.clone(),
+                            is_muted: false,
+                            is_deafened: false,
                         },
                     );
                 }
@@ -322,6 +330,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                         peer: PeerInfo {
                             user_id: user_id.clone(),
                             username,
+                            is_muted: false,
+                            is_deafened: false,
                         },
                     },
                     Some(&user_id),
@@ -431,6 +441,14 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 is_muted,
                 is_deafened,
             } => {
+                // MAJ de l'état mute/deaf côté serveur
+                {
+                    let mut peers = state.peers.lock().await;
+                    if let Some(peer) = peers.get_mut(&user_id) {
+                        peer.is_muted = is_muted;
+                        peer.is_deafened = is_deafened;
+                    }
+                }
                 broadcast_to_channel(
                     &state,
                     &channel_id,
