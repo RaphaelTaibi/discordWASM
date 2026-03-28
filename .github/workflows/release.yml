@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  repository-projects: write
+  pull-requests: write
+
 jobs:
   publish-tauri:
     permissions:
