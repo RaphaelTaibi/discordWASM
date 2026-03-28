@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest]
+        platform: [ windows-latest ]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -60,8 +60,9 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "DiscordWASM v__VERSION__"
-          releaseBody: "Auto-generated release from GitHub Actions"
-          releaseDraft: true
+          releaseBody: "Mise à jour automatique incluant le JSON."
+          releaseDraft: false
           prerelease: false
-
           projectPath: ./apps/desktop
+
+          includeUpdaterJson: true
