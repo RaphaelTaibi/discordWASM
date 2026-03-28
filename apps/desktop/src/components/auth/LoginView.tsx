@@ -1,11 +1,8 @@
 // src/components/auth/LoginView.tsx
 import { useState } from 'react';
+import LoginViewProps from '../../models/loginViewProps.model';
 
-interface Props {
-    onLogin: (username: string) => void;
-}
-
-export const LoginView = ({ onLogin }: Props) => {
+export const LoginView = ({ onLogin }: LoginViewProps) => {
     const [name, setName] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {

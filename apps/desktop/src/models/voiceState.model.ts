@@ -7,6 +7,8 @@ export default interface VoiceState {
     isMuted: boolean;
     isDeafened: boolean;
     error: string | null;
+    localUserId: string;
+    localStream: MediaStream | null;
     joinChannel: (channelId: string, username: string) => Promise<void>;
     leaveChannel: () => void;
     toggleMute: () => void;

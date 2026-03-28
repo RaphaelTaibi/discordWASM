@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react';
+import VoiceAudioRendererProps from '../../models/voiceAudioRendererProps.model';
 
-interface Props {
-    stream: MediaStream;
-    muted: boolean;
-}
-
-export const VoiceAudioRenderer = ({ stream, muted }: Props) => {
+export const VoiceAudioRenderer = ({ stream, muted }: VoiceAudioRendererProps) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {

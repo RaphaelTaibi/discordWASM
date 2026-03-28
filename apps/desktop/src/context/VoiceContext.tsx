@@ -3,6 +3,7 @@ import { ClientSignalMessage } from '../types/clientSignal.type';
 import { ServerSignalMessage } from '../types/serverSignal.type';
 import VoicePeer from '../models/voicePeer.model';
 import VoiceState from '../models/voiceState.model';
+import { useToast } from './ToastContext';
 
 const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || 'ws://127.0.0.1:3001/ws';
 
@@ -26,6 +27,7 @@ const buildUserId = () => {
 };
 
 export const VoiceProvider = ({ children }: { children: ReactNode }) => {
+    const { addToast } = useToast();
     const [channelId, setChannelId] = useState<string | null>(null);
     const [participants, setParticipants] = useState<VoicePeer[]>([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -34,6 +36,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     const [error, setError] = useState<string | null>(null);
     const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
     const [remoteVideoStreams, setRemoteVideoStreams] = useState<Map<string, MediaStream>>(new Map());
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
     const socketRef = useRef<WebSocket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
@@ -76,95 +79,139 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const createPeerConnection = useCallback((peer: VoicePeer) => {
-        const existing = peerConnectionsRef.current.get(peer.userId);
-        if (existing) {
-            return existing;
-        }
+        let pc = peerConnectionsRef.current.get(peer.userId);
+        if (!pc) {
+            pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-        const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-        // Add audio tracks
-        const localStream = localStreamRef.current;
-        if (localStream) {
-            for (const track of localStream.getTracks()) {
-                pc.addTrack(track, localStream);
-            }
-        }
-
-        // Add screen share video track if currently sharing
-        const screenStream = screenStreamRef.current;
-        if (screenStream) {
-            for (const track of screenStream.getVideoTracks()) {
-                pc.addTrack(track, screenStream);
-            }
-        }
-
-        pc.onicecandidate = (event) => {
-            if (!event.candidate || !channelIdRef.current) {
-                return;
+            // Add audio tracks
+            const localStream = localStreamRef.current;
+            if (localStream) {
+                for (const track of localStream.getTracks()) {
+                    pc.addTrack(track, localStream);
+                }
             }
 
-            sendSignal({
-                type: 'ice',
-                channelId: channelIdRef.current,
-                from: userIdRef.current,
-                to: peer.userId,
-                candidate: event.candidate.toJSON(),
-            });
-        };
+            // Ajout du handler negotiationneeded pour renégociation automatique
+            pc.onnegotiationneeded = async () => {
+                if (!channelIdRef.current) return;
+                if (!pc) return;
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    sendSignal({
+                        type: 'offer',
+                        channelId: channelIdRef.current,
+                        from: userIdRef.current,
+                        to: peer.userId,
+                        sdp: offer,
+                    });
+                } catch (e) {
+                    console.warn('[VoiceContext] Erreur negotiationneeded', e);
+                }
+            };
 
-        pc.ontrack = (event) => {
-            const [stream] = event.streams;
-            if (!stream) {
-                return;
-            }
-
-            if (event.track.kind === 'audio') {
-                setRemoteStreams((prev) => {
-                    const next = new Map(prev);
-                    next.set(peer.userId, stream);
-                    return next;
+            pc.onicecandidate = (event) => {
+                if (!event.candidate || !channelIdRef.current) {
+                    return;
+                }
+                sendSignal({
+                    type: 'ice',
+                    channelId: channelIdRef.current,
+                    from: userIdRef.current,
+                    to: peer.userId,
+                    candidate: event.candidate.toJSON(),
                 });
-            } else if (event.track.kind === 'video') {
-                setRemoteVideoStreams((prev) => {
-                    const next = new Map(prev);
-                    next.set(peer.userId, stream);
-                    return next;
-                });
+            };
 
-                // Clean up when remote stops sharing
-                event.track.onended = () => {
-                    setRemoteVideoStreams((prev) => {
+            pc.ontrack = (event) => {
+                const [stream] = event.streams;
+                if (!stream) {
+                    return;
+                }
+
+                if (event.track.kind === 'audio') {
+                    setRemoteStreams((prev) => {
                         const next = new Map(prev);
-                        next.delete(peer.userId);
+                        next.set(peer.userId, stream);
                         return next;
                     });
-                };
-                event.track.onmute = () => {
-                    setRemoteVideoStreams((prev) => {
-                        const next = new Map(prev);
-                        next.delete(peer.userId);
-                        return next;
-                    });
-                };
-                event.track.onunmute = () => {
+
+                    // Clean up when remote stops speaking (track ended or muted)
+                    event.track.onended = () => {
+                        setRemoteStreams((prev) => {
+                            const next = new Map(prev);
+                            next.delete(peer.userId);
+                            return next;
+                        });
+                    };
+                    event.track.onmute = () => {
+                        setRemoteStreams((prev) => {
+                            const next = new Map(prev);
+                            next.delete(peer.userId);
+                            return next;
+                        });
+                    };
+                    event.track.onunmute = () => {
+                        setRemoteStreams((prev) => {
+                            const next = new Map(prev);
+                            next.set(peer.userId, stream);
+                            return next;
+                        });
+                    };
+                } else if (event.track.kind === 'video') {
                     setRemoteVideoStreams((prev) => {
                         const next = new Map(prev);
                         next.set(peer.userId, stream);
                         return next;
                     });
-                };
-            }
-        };
 
-        peerConnectionsRef.current.set(peer.userId, pc);
+                    // Clean up when remote stops sharing
+                    event.track.onended = () => {
+                        setRemoteVideoStreams((prev) => {
+                            const next = new Map(prev);
+                            next.delete(peer.userId);
+                            return next;
+                        });
+                    };
+                    event.track.onmute = () => {
+                        setRemoteVideoStreams((prev) => {
+                            const next = new Map(prev);
+                            next.delete(peer.userId);
+                            return next;
+                        });
+                    };
+                    event.track.onunmute = () => {
+                        setRemoteVideoStreams((prev) => {
+                            const next = new Map(prev);
+                            next.set(peer.userId, stream);
+                            return next;
+                        });
+                    };
+                }
+            };
 
-        setParticipants((prev) => {
-            if (prev.some((p) => p.userId === peer.userId)) {
-                return prev;
+            peerConnectionsRef.current.set(peer.userId, pc);
+
+            setParticipants((prev) => {
+                if (prev.some((p) => p.userId === peer.userId)) {
+                    return prev;
+                }
+                return [...prev, peer];
+            });
+        }
+
+        // Ajout ou MAJ de la track vidéo du screen share si active
+        const screenStream = screenStreamRef.current;
+        if (screenStream) {
+            const videoTrack = screenStream.getVideoTracks()[0];
+            if (videoTrack) {
+                const hasVideo = pc.getSenders().some((s) => s.track?.kind === 'video');
+                if (!hasVideo) {
+                    pc.addTrack(videoTrack, screenStream);
+                    // La renégociation sera auto-déclenchée par onnegotiationneeded
+                }
             }
-            return [...prev, peer];
-        });
+        }
 
         return pc;
     }, [sendSignal]);
@@ -195,7 +242,12 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         if (!pc) {
             return;
         }
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        // Correction : ne setRemoteDescription que si l'état est correct
+        if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        } else {
+            console.warn('[VoiceContext] Ignoré setRemoteDescription(answer) car signalingState =', pc.signalingState);
+        }
     }, []);
 
     const handleIce = useCallback(async (msg: Extract<ServerSignalMessage, { type: 'ice' }>) => {
@@ -226,6 +278,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         }
 
         localStreamRef.current = null;
+        setLocalStream(null);
         screenStreamRef.current = null;
         peerConnectionsRef.current.clear();
 
@@ -268,6 +321,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
             });
 
             localStreamRef.current = localStream;
+            setLocalStream(localStream);
 
             const socket = new WebSocket(SIGNALING_URL);
             socketRef.current = socket;
@@ -294,7 +348,22 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 if (msg.type === 'joined') {
+                    console.log('[VoiceContext] joined reçu', msg);
                     setIsConnected(true);
+                    // Correction : ajouter l'utilisateur local à la liste des participants
+                    setParticipants([
+                        {
+                            userId: userIdRef.current,
+                            username: usernameRef.current,
+                            isMuted: isMuted,
+                            isDeafened: isDeafened,
+                        },
+                        ...msg.peers.map((peer) => ({
+                            ...peer,
+                            isMuted: peer.isMuted ?? false,
+                            isDeafened: peer.isDeafened ?? false,
+                        })),
+                    ]);
                     for (const peer of msg.peers) {
                         const pc = createPeerConnection(peer);
                         const offer = await pc.createOffer();
@@ -317,15 +386,21 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                         }
                         return [...prev, msg.peer];
                     });
+                    addToast(`${msg.peer.username} a rejoint le salon`, 'join');
+                    // SUPPRESSION de la renégociation manuelle ici : on laisse onnegotiationneeded gérer
                     return;
                 }
 
                 if (msg.type === 'peer-left') {
+                    const leavingPeer = participants.find((p) => p.userId === msg.userId);
                     removePeerConnection(msg.userId);
+                    const username = leavingPeer?.username || 'Un utilisateur';
+                    addToast(`${username} a quitté le salon`, 'leave');
                     return;
                 }
 
                 if (msg.type === 'peer-state') {
+                    console.log('[VoiceContext] peer-state reçu', msg);
                     setParticipants((prev) =>
                         prev.map((p) =>
                             p.userId === msg.userId
@@ -363,7 +438,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
             setError(message);
             leaveChannel();
         }
-    }, [createPeerConnection, handleAnswer, handleIce, handleOffer, leaveChannel, removePeerConnection, sendSignal]);
+    }, [createPeerConnection, handleAnswer, handleIce, handleOffer, leaveChannel, removePeerConnection, sendSignal, addToast, participants]);
 
     const toggleMute = useCallback(() => {
         const local = localStreamRef.current;
@@ -419,47 +494,37 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [isMuted, isDeafened, sendSignal]);
 
-    const renegotiateWithPeer = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
-        if (!channelIdRef.current) return;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendSignal({
-            type: 'offer',
-            channelId: channelIdRef.current,
-            from: userIdRef.current,
-            to: peerId,
-            sdp: offer,
-        });
-    }, [sendSignal]);
-
-    const addScreenTrack = useCallback((screenStream: MediaStream) => {
-        screenStreamRef.current = screenStream;
-        const videoTrack = screenStream.getVideoTracks()[0];
-        if (!videoTrack) return;
-
-        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
-            // Don't add if already has a video sender with a track
-            const hasVideo = pc.getSenders().some((s) => s.track?.kind === 'video');
-            if (!hasVideo) {
-                pc.addTrack(videoTrack, screenStream);
-            }
-            renegotiateWithPeer(peerId, pc);
-        }
-    }, [renegotiateWithPeer]);
 
     const removeScreenTrack = useCallback(() => {
         screenStreamRef.current = null;
 
-        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+        for (const [, pc] of peerConnectionsRef.current.entries()) {
             const senders = pc.getSenders();
             for (const sender of senders) {
                 if (sender.track?.kind === 'video') {
                     pc.removeTrack(sender);
                 }
             }
-            renegotiateWithPeer(peerId, pc);
         }
-    }, [renegotiateWithPeer]);
+    }, []);
+
+    const addScreenTrack = useCallback((screenStream: MediaStream) => {
+        screenStreamRef.current = screenStream;
+        const videoTrack = screenStream.getVideoTracks()[0];
+        if (!videoTrack) return;
+        videoTrack.onended = () => {
+            removeScreenTrack();
+        };
+
+        for (const [, pc] of peerConnectionsRef.current.entries()) {
+            // Don't add if already has a video sender with a track
+            const hasVideo = pc.getSenders().some((s) => s.track?.kind === 'video');
+            if (!hasVideo) {
+                pc.addTrack(videoTrack, screenStream);
+            }
+        }
+    }, [removeScreenTrack]);
+
 
     const value = useMemo<VoiceState>(() => ({
         channelId,
@@ -468,6 +533,8 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         isMuted,
         isDeafened,
         error,
+        localUserId: userIdRef.current,
+        localStream,
         joinChannel,
         leaveChannel,
         toggleMute,
@@ -476,7 +543,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         remoteVideoStreams,
         addScreenTrack,
         removeScreenTrack,
-    }), [channelId, participants, isConnected, isMuted, isDeafened, error, joinChannel, leaveChannel, toggleMute, toggleDeafen, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack]);
+    }), [channelId, participants, isConnected, isMuted, isDeafened, error, localStream, joinChannel, leaveChannel, toggleMute, toggleDeafen, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack]);
 
     return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
 };

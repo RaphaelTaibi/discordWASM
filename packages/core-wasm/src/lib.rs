@@ -16,7 +16,7 @@ pub fn analyze_frame(data: &[u8], width: u32, height: u32) -> String {
     // Calcule de la luminosité moyenne
     let mut total: u64 = 0;
     for i in (0..data.len()).step_by(4) {
-        total += data[i] as u64; // Canal rouge pour le test
+        total += data[i] as u64; 
     }
 
     let avg = total / (width * height) as u64;

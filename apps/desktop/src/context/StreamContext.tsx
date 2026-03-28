@@ -1,13 +1,10 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import StreamState from "../models/streamState.model.ts";
 import StreamMetrics from "../models/streamMetrics.model.ts";
+import { AnalyzerWorkerOutgoingMessage } from '../types/analyzerWorkerMessage.type';
 
 import AnalyzerWorker from '../worker/analyzer.worker.ts?worker';
 
-type AnalyzerWorkerOutgoingMessage =
-    | { type: 'READY' }
-    | { type: 'RESULT'; payload: { lum: number; status: string; raw: string } }
-    | { type: 'ERROR'; error: string };
 
 const createAnalysisCanvas = (): OffscreenCanvas | HTMLCanvasElement => {
     if (typeof OffscreenCanvas !== 'undefined') {
@@ -109,7 +106,7 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
             if (isStreaming) return;
 
             const media = await navigator.mediaDevices.getDisplayMedia({
-                video: { width: 1280, height: 720 },
+                video: { width: 1280, height: 720, frameRate: { ideal: 60, max: 60 } },
                 audio: false
             });
 
