@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DiscordWASM",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "identifier": "com.discord.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -12,23 +12,25 @@
   "app": {
     "windows": [
       {
-        "title": "DiscordWASM",
-        "fullscreen": false,
-        "resizable": true
+        "title": "Discord WASM",
+        "width": 1280,
+        "height": 720
       }
     ],
     "security": {
       "csp": null
     }
   },
-  "updater": {
+  "plugins": {
+    "updater": {
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCNzQ5MDk3QjkwRTg3REYKUldUZmh3NjVsNUIwUzRkSzRHYmNRWHhJakRuVm9JU2M4d29XVFkyYnlLUGtJMkord1MwV3RaUVIK",
       "endpoints": [
         "https://github.com/RaphaelTaibi/discordWASM/releases/latest/download/latest.json"
       ],
-    "dialog": true
-    },
+      "dialog": true
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
