@@ -6,7 +6,8 @@ import VoiceState from '../models/voiceState.model';
 import { useToast } from './ToastContext';
 import initWasm, { calculate_network_quality } from '../pkg/core_wasm';
 
-const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || 'ws://127.0.0.1:3001/ws';
+// On s'assure que l'URL est bien récupérée, avec un log pour débugger dans le build
+const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -55,12 +56,36 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     const usernameRef = useRef<string>('Anonymous');
     const channelIdRef = useRef<string | null>(null);
 
-    useEffect(() => {
-        initWasm().then(() => setWasmReady(true)).catch(e => { console.error("WASM stats init failed", e); setWasmReady(true); });
+    const connectSocket = useCallback(() => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) return;
         
-        // Connexion au socket dès le montage pour le chat
+        console.log("URL de signaling utilisée:", SIGNALING_URL);
         const socket = new WebSocket(SIGNALING_URL);
         socketRef.current = socket;
+
+        socket.onopen = () => {
+            console.log("Connecté au signaling");
+            if (channelIdRef.current) {
+                socket.send(JSON.stringify({ 
+                    type: 'join', 
+                    channelId: channelIdRef.current, 
+                    userId: userIdRef.current, 
+                    username: usernameRef.current 
+                }));
+            }
+        };
+
+        socket.onerror = (e) => {
+            console.error("Erreur WebSocket détaillée:", e);
+            // On affiche l'URL dans le toast pour que tu puisses vérifier sur l'exe
+            addToast(`Erreur connexion: ${SIGNALING_URL}`, 'error');
+        };
+
+        socket.onclose = (event) => {
+            console.warn(`WebSocket fermé (code: ${event.code}), reconnexion dans 3s...`);
+            setIsConnected(false);
+            setTimeout(connectSocket, 3000);
+        };
         
         socket.onmessage = async (event) => {
             try {
@@ -104,11 +129,15 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                         setChatMessages(prev => [...prev, { id: `${msg.from}-${msg.timestamp}`, from: msg.from, username: msg.username, message: msg.message, timestamp: Number(msg.timestamp) }]);
                         break;
                 }
-            } catch (e) { console.error("Socket error", e); }
+            } catch (e) { console.error("Message error", e); }
         };
+    }, [addToast]);
 
-        return () => { socket.close(); };
-    }, []); // On ne ferme/rouvre plus le socket à chaque join/leave
+    useEffect(() => {
+        initWasm().then(() => setWasmReady(true)).catch(e => { console.error("WASM stats error", e); setWasmReady(true); });
+        connectSocket();
+        return () => { socketRef.current?.close(); };
+    }, [connectSocket]);
 
     useEffect(() => {
         if (!isConnected || !wasmReady) return;
@@ -175,7 +204,6 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         channelIdRef.current = null;
         setParticipants([]);
         setRemoteStreams(new Map());
-        // On ne vide PAS chatMessages ici pour garder l'historique de la session
     }, [sendSignal]);
 
     const joinChannel = useCallback(async (nextChannelId: string, username: string) => {
@@ -202,9 +230,14 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
             channelIdRef.current = nextChannelId;
             setChannelId(nextChannelId);
-            sendSignal({ type: 'join', channelId: nextChannelId, userId: userIdRef.current, username });
-        } catch (err) { console.error("Join channel error", err); setError("Erreur d'accès au microphone"); }
-    }, [leaveChannel, sendSignal]);
+            
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+                sendSignal({ type: 'join', channelId: nextChannelId, userId: userIdRef.current, username });
+            } else {
+                connectSocket();
+            }
+        } catch (err) { console.error("Join error", err); setError("Erreur micro"); }
+    }, [leaveChannel, sendSignal, connectSocket]);
 
     const toggleMute = useCallback(() => {
         const next = !isMuted;
@@ -224,7 +257,6 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     }, [isDeafened, sendSignal]);
 
     const sendChatMessage = useCallback((message: string) => {
-        // On permet l'envoi dès qu'on a un channelId, même si isConnected n'est pas encore true
         if (!channelIdRef.current || !message.trim()) return;
         sendSignal({ type: 'chat', channelId: channelIdRef.current, from: userIdRef.current, username: usernameRef.current, message, timestamp: Date.now() });
     }, [sendSignal]);
