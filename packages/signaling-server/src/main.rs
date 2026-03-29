@@ -75,7 +75,7 @@ enum ClientMessage {
         from: String,
         username: String,
         message: String,
-        timestamp: String,
+        timestamp: u64, // Correction : u64 au lieu de String
     },
 }
 
@@ -131,7 +131,7 @@ enum ServerMessage {
         from: String,
         username: String,
         message: String,
-        timestamp: String,
+        timestamp: u64, // Correction : u64 au lieu de String
     },
     Error {
         message: String,
