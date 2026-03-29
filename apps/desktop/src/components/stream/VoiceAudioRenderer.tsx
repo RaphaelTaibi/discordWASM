@@ -15,8 +15,10 @@ export const VoiceAudioRenderer = ({ stream, muted, peerId }: VoiceAudioRenderer
             audio.srcObject = stream;
         }
         
-        audio.muted = false;
-        audio.volume = muted ? 0 : volume;
+        const safeVolume = Math.max(0, Math.min(1, volume));
+
+        audio.muted = muted || safeVolume === 0;
+        audio.volume = safeVolume;
 
         const playAudio = async () => {
             try {

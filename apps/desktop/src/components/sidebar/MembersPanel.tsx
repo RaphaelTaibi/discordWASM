@@ -1,6 +1,8 @@
 import { Headphones, MicOff, Volume2 } from 'lucide-react';
+import { useState } from 'react';
 import { useVoiceStore } from '../../context/VoiceContext';
 import MembersPanelProps from '../../models/membersPanelProps.model';
+import { UserContextMenu } from '../ui/UserContextMenu';
 
 export const MembersPanel = ({
     participants,
@@ -9,6 +11,18 @@ export const MembersPanel = ({
     speakingUsers,
 }: MembersPanelProps) => {
     const { localUserId, userVolumes, setUserVolume } = useVoiceStore();
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, userId: string, username: string } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent, userId: string, username: string) => {
+        if (userId === localUserId) return;
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            userId,
+            username
+        });
+    };
 
     return (
         <div className="h-full flex flex-col bg-[#232428] border-l border-black/20">
@@ -26,13 +40,12 @@ export const MembersPanel = ({
                     const memberMuted = !!member.isMuted;
                     const memberDeafened = !!member.isDeafened;
                     const isSpeaking = speakingUsers?.get(member.userId) ?? false;
-                    // Ne pas afficher le slider pour soi-même
-                    const showVolume = member.userId !== localUserId;
                     const volume = userVolumes.get(member.userId) ?? 1;
 
                     return (
                         <div
                             key={member.userId}
+                            onContextMenu={(e) => handleContextMenu(e, member.userId, member.username)}
                             className={`flex items-center gap-2 bg-[#35373c] rounded-lg px-3 py-2 transition-all duration-200 hover:bg-[#404249] animate-[fadeIn_0.2s_ease-out] border border-transparent hover:border-[#5865f2] ${isSpeaking ? 'ring-2 ring-green-500' : ''}`}
                         >
                             <div className={`w-8 h-8 rounded-full bg-[#5865f2] text-white text-sm font-bold flex items-center justify-center transition-all duration-300 ${
@@ -52,22 +65,22 @@ export const MembersPanel = ({
                                     {memberMuted ? 'Mute' : 'Live'}
                                 </span>
                             </div>
-                            {showVolume && (
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={2}
-                                    step={0.01}
-                                    value={volume}
-                                    onChange={e => setUserVolume(member.userId, Number(e.target.value))}
-                                    className="ml-2 w-16 h-2 accent-blue-500 bg-[#232428] rounded-full border border-black/20"
-                                    title="Volume utilisateur"
-                                />
-                            )}
                         </div>
                     );
                 })}
             </div>
+
+            {contextMenu && (
+                <UserContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    userId={contextMenu.userId}
+                    username={contextMenu.username}
+                    volume={userVolumes.get(contextMenu.userId) ?? 1}
+                    onVolumeChange={(vol) => setUserVolume(contextMenu.userId, vol)}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
         </div>
     );
 };

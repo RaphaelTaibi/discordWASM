@@ -3,9 +3,11 @@ import { useChatStore } from '../../context/ChatContext';
 import { useVoiceStore } from '../../context/VoiceContext';
 import { Send } from 'lucide-react';
 
+const MAX_CHARACTERS = 300;
+
 export const ChatPanel = () => {
     const { chatMessages, sendChatMessage } = useChatStore();
-    const { localUserId, channelId } = useVoiceStore();
+    const { localUserId } = useVoiceStore();
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -16,12 +18,15 @@ export const ChatPanel = () => {
 
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
-        const trimmedInput = input.trim();
-        if (trimmedInput && channelId) {
+        const trimmedInput = input.trim().slice(0, MAX_CHARACTERS);
+        if (trimmedInput) {
             sendChatMessage(trimmedInput);
             setInput('');
         }
     };
+
+    const remainingChars = MAX_CHARACTERS - input.length;
+    const isNearLimit = input.length > MAX_CHARACTERS * 0.8;
 
     return (
         <div className="absolute inset-0 flex flex-col bg-[#313338] text-[#dbdee1]">
@@ -60,22 +65,29 @@ export const ChatPanel = () => {
             </div>
 
             <div className="px-4 pb-6 pt-2 bg-[#313338]">
-                <form onSubmit={handleSend} className="relative flex items-center">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        disabled={!channelId}
-                        placeholder={channelId ? "Envoyer un message dans #chat-general" : "Connectez-vous à un salon vocal pour discuter"}
-                        className="w-full bg-[#383a40] text-[15px] text-[#dbdee1] rounded-[8px] px-4 py-2.5 focus:outline-none focus:ring-0 placeholder:text-[#949ba4] disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                    <button 
-                        type="submit"
-                        className="absolute right-3 p-1 text-[#b5bac1] hover:text-[#dbdee1] disabled:opacity-30 transition-colors"
-                        disabled={!input.trim() || !channelId}
-                    >
-                        <Send size={20} />
-                    </button>
+                <form onSubmit={handleSend} className="relative flex flex-col gap-1">
+                    <div className="relative flex items-center">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            maxLength={MAX_CHARACTERS}
+                            placeholder={`Envoyer un message dans #chat-general`}
+                            className="w-full bg-[#383a40] text-[15px] text-[#dbdee1] rounded-[8px] px-4 py-2.5 focus:outline-none focus:ring-0 placeholder:text-[#949ba4]"
+                        />
+                        <button 
+                            type="submit"
+                            className="absolute right-3 p-1 text-[#b5bac1] hover:text-[#dbdee1] disabled:opacity-30 transition-colors"
+                            disabled={!input.trim()}
+                        >
+                            <Send size={20} />
+                        </button>
+                    </div>
+                    {isNearLimit && (
+                        <div className={`text-[10px] self-end font-medium ${remainingChars <= 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                            {remainingChars} caractères restants
+                        </div>
+                    )}
                 </form>
             </div>
         </div>

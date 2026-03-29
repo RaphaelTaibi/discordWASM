@@ -1,18 +1,15 @@
 import { createContext, ReactNode, useContext, useEffect, useState, useCallback } from 'react';
-import { useVoiceStore, ChatMessage } from './VoiceContext';
+import { useVoiceStore } from './VoiceContext';
+import ChatMessage from '../models/chatMessage.model';
+import ChatContextValue from '../models/chatContextValue.model';
 
-interface ChatContextType {
-    chatMessages: ChatMessage[];
-    sendChatMessage: (message: string) => void;
-    clearHistory: () => void;
-}
-
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
+const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'chat_history_main';
+const MAX_MESSAGES = 100; // Limite pour éviter la saturation du localStorage
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
-    const { chatMessages: socketMessages, sendChatMessage: sendViaSocket, isConnected } = useVoiceStore();
+    const { chatMessages: socketMessages, sendChatMessage: sendViaSocket } = useVoiceStore();
     const [persistedMessages, setPersistedMessages] = useState<ChatMessage[]>([]);
 
     // Charger l'historique au montage
@@ -20,33 +17,44 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
-                setPersistedMessages(JSON.parse(saved));
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    // On garde seulement les derniers messages si l'historique est trop long
+                    const sliced = parsed.slice(-MAX_MESSAGES);
+                    setPersistedMessages(sliced);
+                }
             } catch (e) {
                 console.error("Failed to parse chat history", e);
             }
         }
     }, []);
 
-    // Observer les messages arrivant via le socket dans VoiceContext
+    // Synchroniser avec les messages arrivant du VoiceStore (Socket)
     useEffect(() => {
         if (socketMessages.length === 0) return;
 
         setPersistedMessages(prev => {
-            // On prend tous les messages qu'on n'a pas encore dans notre état local
-            const newMessages = socketMessages.filter(sm => !prev.some(pm => pm.id === sm.id));
-            if (newMessages.length === 0) return prev;
+            // Fusionner sans doublons
+            const existingIds = new Set(prev.map(m => m.id));
+            const newOnes = socketMessages.filter(m => !existingIds.has(m.id));
+            
+            if (newOnes.length === 0) return prev;
 
-            const combined = [...prev, ...newMessages];
-            const sliced = combined.slice(-200); // Garder les 200 derniers
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(sliced));
-            return sliced;
+            // Garder seulement les X derniers messages
+            const combined = [...prev, ...newOnes].slice(-MAX_MESSAGES);
+            
+            // Sauvegarde asynchrone pour ne pas bloquer le thread principal
+            setTimeout(() => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+            }, 0);
+
+            return combined;
         });
     }, [socketMessages]);
 
     const sendChatMessage = useCallback((message: string) => {
-        if (!message.trim() || !isConnected) return;
         sendViaSocket(message);
-    }, [sendViaSocket, isConnected]);
+    }, [sendViaSocket]);
 
     const clearHistory = useCallback(() => {
         localStorage.removeItem(STORAGE_KEY);

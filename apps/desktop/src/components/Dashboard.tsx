@@ -12,9 +12,10 @@ import { Headphones } from 'lucide-react';
 import { useTauriUpdater } from '../lib/useTauriUpdater';
 import { SidebarView } from '../models/sidebarContentProps.model';
 import { ChatPanel } from './chat/ChatPanel';
+import { UserContextMenu } from './ui/UserContextMenu';
 
 const Dashboard = () => {
-    const { username, logout } = useAuth();
+    const { username, userId, logout } = useAuth();
     const { stream, metrics, isStreaming, startCapture, stopCapture } = useStreamStore();
     const {
         channelId,
@@ -35,10 +36,21 @@ const Dashboard = () => {
         removeScreenTrack,
         networkQuality,
         ping,
+        setUserInfo,
+        userVolumes,
+        setUserVolume
     } = useVoiceStore();
 
     const [activeView, setActiveView] = useState<SidebarView>('voice');
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, userId: string, username: string } | null>(null);
     
+    // Synchroniser les infos utilisateur avec le VoiceStore dès l'arrivée sur le Dashboard
+    useEffect(() => {
+        if (username && userId) {
+            setUserInfo(username, userId);
+        }
+    }, [username, userId, setUserInfo]);
+
     // Memoization des remoteStreams pour éviter les cycles de re-rendu infinis dans useVoiceActivity
     const memoizedRemoteStreams = useMemo(() => new Map(remoteStreams), [remoteStreams]);
     const speakingUsers = useVoiceActivity(memoizedRemoteStreams, localUserId, localStream, isMuted);
@@ -55,6 +67,17 @@ const Dashboard = () => {
             }
         };
     }, [isStreaming, stream, isConnected]);
+
+    const handleContextMenu = (e: React.MouseEvent, userId: string, username: string) => {
+        if (userId === localUserId) return;
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            userId,
+            username
+        });
+    };
 
     const safeUsername = username || 'Anonyme';
     const stageCards = [
@@ -185,7 +208,7 @@ const Dashboard = () => {
 
                         if (remoteVideo) {
                             return (
-                                <div key={card.id} className="relative">
+                                <div key={card.id} className="relative" onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}>
                                     <StreamCard
                                         stream={remoteVideo}
                                         username={card.username}
@@ -196,7 +219,11 @@ const Dashboard = () => {
                         }
 
                         return (
-                            <div key={card.id} className="relative aspect-video rounded-lg overflow-hidden bg-[#1e1f22] border border-black/30 transition-all duration-300 hover:scale-[1.01]">
+                            <div 
+                                key={card.id} 
+                                onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}
+                                className="relative aspect-video rounded-lg overflow-hidden bg-[#1e1f22] border border-black/30 transition-all duration-300 hover:scale-[1.01] cursor-pointer"
+                            >
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className={`w-20 h-20 rounded-full bg-[#3f4147] text-white flex items-center justify-center text-2xl font-bold transition-all duration-300 ${
                                         isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
@@ -229,6 +256,18 @@ const Dashboard = () => {
                 .map(([peerId, audioStream]) => (
                     <VoiceAudioRenderer key={peerId} stream={audioStream} muted={isDeafened} peerId={peerId} />
             ))}
+
+            {contextMenu && (
+                <UserContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    userId={contextMenu.userId}
+                    username={contextMenu.username}
+                    volume={userVolumes.get(contextMenu.userId) ?? 1}
+                    onVolumeChange={(vol) => setUserVolume(contextMenu.userId, vol)}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
 
             {updateAvailable && (
                 <div className="fixed bottom-4 right-4 bg-blue-700 text-white px-4 py-2 rounded shadow-lg z-50">

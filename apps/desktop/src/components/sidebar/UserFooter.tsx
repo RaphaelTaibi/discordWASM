@@ -1,16 +1,6 @@
 import { Headphones, Mic, MicOff, Settings, PhoneOff, LogOut, MonitorUp, MonitorOff } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import UserBarProps from '../../models/userBarProps.model';
-
-export interface UserFooterProps extends UserBarProps {
-    onLeave?: () => void;
-    onLogout?: () => void;
-    onStream?: () => void;
-    isStreaming?: boolean;
-    networkQuality?: 0 | 1 | 2 | 3;
-    ping?: number; // Nouveau: Ping en ms
-    updateCheck?: () => void;
-}
+import UserFooterProps from '../../models/userFooterProps.model';
 
 const NetworkIcon = ({ quality }: { quality: 0 | 1 | 2 | 3 }) => {
     const getColor = () => {
@@ -53,7 +43,7 @@ const UserFooter = ({
     onStream,
     isStreaming,
     networkQuality = 3,
-    ping = 24, // Valeur par défaut réaliste
+    ping = 24,
     updateCheck,
 }: UserFooterProps) => {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -74,7 +64,6 @@ const UserFooter = ({
 
     return (
         <div className="w-full select-none bg-[#232428] flex flex-col flex-shrink-0 border-t border-black/10">
-            {/* 1. BARRE DE CONNEXION VOCALE */}
             {channelId && (
                 <div className="h-[48px] px-2 flex items-center border-b border-white/[0.04]">
                     <div 
@@ -84,7 +73,6 @@ const UserFooter = ({
                     >
                         <NetworkIcon quality={isConnected ? networkQuality : 0} />
                         
-                        {/* Tooltip Ping */}
                         {showPing && isConnected && (
                             <div className="absolute -top-10 left-0 bg-[#111214] text-white text-[12px] px-2 py-1 rounded-[4px] shadow-xl whitespace-nowrap z-50 animate-in fade-in zoom-in duration-150">
                                 <span className="font-bold">{ping}ms</span>
@@ -124,7 +112,6 @@ const UserFooter = ({
                 </div>
             )}
 
-            {/* 2. BARRE UTILISATEUR */}
             <div className="h-[52px] flex items-center px-2">
                 <div className="flex items-center min-w-0 flex-1 px-1 py-1 rounded-[4px] hover:bg-[#35373c] cursor-pointer transition-colors duration-150">
                     <div className="relative flex-shrink-0">
