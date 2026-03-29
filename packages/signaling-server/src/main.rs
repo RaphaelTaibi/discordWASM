@@ -162,6 +162,18 @@ async fn send_to_user(state: &Arc<AppState>, user_id: &str, message: &ServerMess
     }
 }
 
+async fn broadcast_global(state: &Arc<AppState>, message: &ServerMessage) {
+    let payload = match serialize_message(message) {
+        Some(payload) => payload,
+        None => return,
+    };
+
+    let peers = state.peers.lock().await;
+    for peer in peers.values() {
+        let _ = peer.tx.send(payload.clone());
+    }
+}
+
 async fn broadcast_to_channel(state: &Arc<AppState>, channel_id: &str, message: &ServerMessage, exclude: Option<&str>) {
     let payload = match serialize_message(message) {
         Some(payload) => payload,
@@ -395,7 +407,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 broadcast_to_channel(&state, &channel_id, &ServerMessage::PeerState { channel_id: channel_id.clone(), user_id: user_id.clone(), is_muted, is_deafened }, Some(&user_id)).await;
             }
             ClientMessage::Chat { channel_id, from, username, message, timestamp } => {
-                broadcast_to_channel(&state, &channel_id, &ServerMessage::Chat { channel_id: channel_id.clone(), from, username, message, timestamp }, None).await;
+                broadcast_global(&state, &ServerMessage::Chat { channel_id: channel_id.clone(), from, username, message, timestamp }).await;
             }
         }
     }
