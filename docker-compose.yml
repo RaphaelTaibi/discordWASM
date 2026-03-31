@@ -1,0 +1,15 @@
+services:
+  signaling-server:
+    image: signaling-server
+    container_name: signaling-live
+    ports:
+      - "3001:3001"
+      - "10000-10100:10000-10100/udp"
+    restart: always
+    # Optionnel : force le réseau bridge pour éviter les conflits DNS
+    networks:
+      - signaling-net
+
+networks:
+  signaling-net:
+    driver: bridge
