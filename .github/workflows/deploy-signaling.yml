@@ -1,71 +1,42 @@
-name: Deploy Signaling Server
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'packages/signaling-server/**'
-      - '.github/workflows/deploy-signaling.yml'
+- name: Archive project for transfer
+    run: |
+      # On archive TOUT le contexte nécessaire au build Docker
+      # (On ne compile pas sur GitHub, on laisse la VM le faire via Docker)
+      tar -czvf deploy.tar.gz \
+        --exclude='target' \
+        --exclude='node_modules' \
+        --exclude='.git' \
+        .
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Copy archive to Oracle VM
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.ORACLE_HOST }}
+        username: ubuntu
+        key: ${{ secrets.ORACLE_SSH_KEY }}
+        source: "deploy.tar.gz"
+        target: "/home/ubuntu" # On envoie à la racine de l'user
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.88.0
-
-      - name: Build Signaling Server
-        run: cargo build --release -p signaling-server
-
-      - name: Archive project for transfer
-        run: |
-          # On ne package QUE le binaire pré-compilé et les fichiers Docker !
-          tar -czvf ../deploy.tar.gz \
-            docker-compose.yml Dockerfile target/release/signaling-server
-            
-          # On la déplace ensuite dans le workspace
-          mv ../deploy.tar.gz ./deploy.tar.gz
-
-      - name: Copy archive to Oracle VM
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ubuntu
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          source: "deploy.tar.gz"
-          target: "/home/ubuntu/discordWASM"
-
-      - name: Extract, Build and Restart
-        uses: appleboy/ssh-action@master
-        env:
-          PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
-          BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ubuntu
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          envs: PRIMARY_PIN_HASH,BACKUP_PIN_HASH
-          script: |
-            # 1. Préparation du dossier
-            mkdir -p ~/discordWASM
-            
-            # 2. Extraction (on force l'écrasement pour mettre à jour le code)
-            tar -xzvf ~/discordWASM/deploy.tar.gz -C ~/discordWASM
-            cd ~/discordWASM
-            
-            # 3. Injection des Secrets via fichier .env de manière sécurisée
-            echo "PRIMARY_PIN_HASH='${PRIMARY_PIN_HASH}'" > .env
-            echo "BACKUP_PIN_HASH='${BACKUP_PIN_HASH}'" >> .env
-            
-            # 4. Build et relance (avec docker compose natif direct)
-            sudo docker compose up -d --build signaling-server
-            
-            # 5. Cleanup approfondi pour éviter la saturation du disque
-            sudo docker image prune -f
-            sudo docker builder prune -f
-            rm -f ~/discordWASM/deploy.tar.gz
+    - name: Extract, Build and Restart
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.ORACLE_HOST }}
+        username: ubuntu
+        key: ${{ secrets.ORACLE_SSH_KEY }}
+        script: |
+          # 1. Extraction dans le dossier de travail
+          mkdir -p ~/discordWASM
+          tar -xzvf ~/deploy.tar.gz -C ~/discordWASM
+          cd ~/discordWASM
+          
+          # 2. Injection des Secrets pour Docker Build
+          export PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
+          export BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
+          
+          # 3. Build et Relance
+          # Le -E permet de passer les variables d'env à sudo pour Docker
+          sudo -E docker compose up -d --build signaling-server
+          
+          # 4. Nettoyage
+          sudo docker image prune -f
+          rm ~/deploy.tar.gz
