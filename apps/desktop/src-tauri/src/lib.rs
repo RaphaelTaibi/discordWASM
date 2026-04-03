@@ -45,11 +45,15 @@ impl ServerCertVerifier for MyVerifier {
         let hash = hasher.finalize();
         let hash_base64 = general_purpose::STANDARD.encode(hash);
 
-        if hash_base64 == PRIMARY_PIN || hash_base64 == BACKUP_PIN {
+        // Nettoyage des guillemets éventuels pour éviter les bugs de comparaison causés par les fichiers .env
+        let clean_primary = PRIMARY_PIN.trim_matches('"');
+        let clean_backup = BACKUP_PIN.trim_matches('"');
+
+        if hash_base64 == clean_primary || hash_base64 == clean_backup {
             println!("✅ Pinning validé : {} matches !", hash_base64);
             Ok(ServerCertVerified::assertion())
         } else {
-            println!("❌ ALERTE MITM : Reçu {}", hash_base64);
+            println!("❌ ALERTE MITM : Reçu '{}' (Attendu: '{}')", hash_base64, clean_primary);
             Err(Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer))
         }
     }

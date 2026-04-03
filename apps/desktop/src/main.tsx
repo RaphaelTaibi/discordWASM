@@ -13,6 +13,26 @@ window.addEventListener('unhandledrejection', (event) => {
   error(`Unhandled rejection: ${event.reason}`);
 });
 
+// Helper for safe serializing of logs (to prevent Circular Structure errors)
+const safeFormat = (arg: any) => {
+  if (typeof arg === 'string') return arg;
+  if (arg instanceof Error) return arg.stack || arg.message;
+  try {
+    const cache = new Set();
+    return JSON.stringify(arg, (_key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (cache.has(value)) {
+          return '[Circular]';
+        }
+        cache.add(value);
+      }
+      return value;
+    });
+  } catch (err) {
+    return String(arg);
+  }
+};
+
 // Alias console functions to Tauri log plugin
 const originalConsoleLog = console.log;
 const originalConsoleInfo = console.info;
@@ -22,32 +42,32 @@ const originalConsoleDebug = console.debug;
 const originalConsoleTrace = console.trace;
 
 console.log = (...args) => {
-  info(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  info(args.map(safeFormat).join(' '));
   originalConsoleLog(...args);
 };
 
 console.info = (...args) => {
-  info(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  info(args.map(safeFormat).join(' '));
   originalConsoleInfo(...args);
 };
 
 console.warn = (...args) => {
-  warn(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  warn(args.map(safeFormat).join(' '));
   originalConsoleWarn(...args);
 };
 
 console.error = (...args) => {
-  error(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  error(args.map(safeFormat).join(' '));
   originalConsoleError(...args);
 };
 
 console.debug = (...args) => {
-  debug(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  debug(args.map(safeFormat).join(' '));
   originalConsoleDebug(...args);
 };
 
 console.trace = (...args) => {
-  trace(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  trace(args.map(safeFormat).join(' '));
   originalConsoleTrace(...args);
 };
 
