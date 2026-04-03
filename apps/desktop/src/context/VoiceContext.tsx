@@ -9,7 +9,7 @@ import { invoke } from '@tauri-apps/api/core';
 import WebSocket from '@tauri-apps/plugin-websocket';
 
 const RAW_URL = import.meta.env.VITE_SIGNALING_URL || "wss://127.0.0.1:3001/ws";
-const SIGNALING_URL = RAW_URL.replace(/(^"|"$)/g, '').replace(/(^'|'$)/g, '');
+const SIGNALING_URL = RAW_URL.replace(/^["']/, "").replace(/["']$/, "");
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },

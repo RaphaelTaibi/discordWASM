@@ -18,7 +18,14 @@ export function useTauriUpdater(pollingIntervalMs: number = 20 * 60 * 1000) {
                 setUpdateAvailable(false);
                 setUpdateObj(null);
             }
-        } catch (e) {
+        } catch (e: any) {
+            // Prevent showing an error if it's just the "Dev URL" blocking the updater locally
+            if (e && typeof e.message === 'string' && e.message.includes('HTTP function')) {
+                // Ignore it gracefully during development
+                return;
+            }
+            
+            console.error("Update check failed:", e);
             setUpdateStatus('Erreur lors de la vérification des mises à jour');
             setTimeout(() => setUpdateStatus(null), 5000);
         }
