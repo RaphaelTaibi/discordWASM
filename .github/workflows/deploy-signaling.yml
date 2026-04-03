@@ -2,7 +2,14 @@ name: Deploy Signaling Server
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+    paths:
+      - 'packages/signaling-server/**'
+      - 'packages/core-wasm/**' # Ajoute ici tes autres dépendances internes si besoin
+      - '.github/workflows/deploy-signaling.yml'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
   workflow_dispatch:
 
 jobs:
@@ -12,20 +19,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-unknown-linux-gnu # Cible pour Oracle ARM
 
-      - name: Build Binary (Heavy lifting on GitHub)
-        # On passe les secrets ici pour la macro env!() au moment de la compilation
+      - name: Install ARM64 Linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build Binary (ARM64)
         env:
           PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
           BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
-        run: cargo build --release -p signaling-server
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: cargo build --release --target aarch64-unknown-linux-gnu -p signaling-server
 
       - name: Prepare Deployment Package
         run: |
-          # On déplace le binaire au même niveau que le Dockerfile pour le contexte Docker
-          cp target/release/signaling-server .
+          # On récupère le binaire dans le dossier de la target spécifique
+          cp target/aarch64-unknown-linux-gnu/release/signaling-server .
           tar -czvf deploy.tar.gz \
             docker-compose.yml \
             Dockerfile \
@@ -47,11 +62,19 @@ jobs:
           username: ubuntu
           key: ${{ secrets.ORACLE_SSH_KEY }}
           script: |
+            # 1. Préparation
             mkdir -p ~/discordWASM
+            
+            # 2. Nettoyage de l'ancien binaire (pour éviter les conflits de format)
+            rm -f ~/discordWASM/signaling-server
+            
+            # 3. Extraction
             tar -xzvf ~/deploy.tar.gz -C ~/discordWASM
             cd ~/discordWASM
             
-            # Ici, docker build sera instantané car le binaire est déjà là
+            # 4. Relance Docker (Build instantané car binaire présent)
             sudo docker compose up -d --build signaling-server
             
+            # 5. Ménage
             rm ~/deploy.tar.gz
+            sudo docker image prune -f
