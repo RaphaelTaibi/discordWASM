@@ -2,29 +2,36 @@ name: Deploy Signaling Server
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'packages/signaling-server/**'
-      - '.github/workflows/deploy-signaling.yml'
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Archive project for transfer
-        run: |
-          tar -czvf deploy.tar.gz \
-            --exclude='target' \
-            --exclude='node_modules' \
-            --exclude='.git' \
-            .
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Copy archive to Oracle VM
+      - name: Build Binary (Heavy lifting on GitHub)
+        # On passe les secrets ici pour la macro env!() au moment de la compilation
+        env:
+          PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
+          BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
+        run: cargo build --release -p signaling-server
+
+      - name: Prepare Deployment Package
+        run: |
+          # On déplace le binaire au même niveau que le Dockerfile pour le contexte Docker
+          cp target/release/signaling-server .
+          tar -czvf deploy.tar.gz \
+            docker-compose.yml \
+            Dockerfile \
+            signaling-server
+
+      - name: Copy to Oracle VM
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.ORACLE_HOST }}
@@ -33,25 +40,18 @@ jobs:
           source: "deploy.tar.gz"
           target: "/home/ubuntu"
 
-      - name: Extract, Build and Restart
+      - name: Deploy on VM
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.ORACLE_HOST }}
           username: ubuntu
           key: ${{ secrets.ORACLE_SSH_KEY }}
           script: |
-            # 1. Extraction
             mkdir -p ~/discordWASM
             tar -xzvf ~/deploy.tar.gz -C ~/discordWASM
             cd ~/discordWASM
             
-            # 2. Injection des Secrets pour le build Docker
-            export PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
-            export BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
+            # Ici, docker build sera instantané car le binaire est déjà là
+            sudo docker compose up -d --build signaling-server
             
-            # 3. Build et Relance avec héritage d'environnement
-            sudo -E docker compose up -d --build signaling-server
-            
-            # 4. Nettoyage
-            sudo docker image prune -f
             rm ~/deploy.tar.gz
