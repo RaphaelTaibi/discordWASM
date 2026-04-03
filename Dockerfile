@@ -1,5 +1,5 @@
 # 1. Utilise l'image officielle Rust
-FROM rust:1.86-slim AS builder
+FROM rust:1.88-slim AS builder
 
 # Installation des dépendances de compilation
 RUN apt-get update && apt-get install -y \
