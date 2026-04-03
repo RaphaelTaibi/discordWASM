@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.7", features = ["ws"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", features = ["aws-lc-rs"] }
 tokio = { version = "1.0", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors"] }
 serde = { version = "1.0", features = ["derive"] }
