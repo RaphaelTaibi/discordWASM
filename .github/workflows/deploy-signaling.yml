@@ -16,14 +16,12 @@ jobs:
 
       - name: Archive project for transfer
         run: |
-          # Création de l'archive dans le dossier parent pour éviter le conflit de lecture
+          # Création de l'archive uniquement avec les fichiers nécessaires au backend
           tar -czvf ../deploy.tar.gz \
             --exclude='target' \
             --exclude='node_modules' \
-            --exclude='.git' \
-            --exclude='apps/desktop/src-tauri/target' \
-            --exclude='apps/desktop/dist' \
-            .
+            docker-compose.yml Dockerfile Cargo.toml Cargo.lock packages/
+            
           # On la déplace ensuite dans le workspace pour l'étape de copie (scp)
           mv ../deploy.tar.gz ./deploy.tar.gz
 
@@ -51,13 +49,13 @@ jobs:
             tar -xzvf ~/discordWASM-deploy/deploy.tar.gz -C ~/discordWASM
             cd ~/discordWASM
             
-            # 3. Injection des Secrets (indispensable pour env!() et Dockerfile ARG)
-            export PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
-            export BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
+            # 3. Injection des Secrets via fichier .env (sécurisé et géré par Docker)
+            echo "PRIMARY_PIN_HASH=${{ secrets.PRIMARY_PIN_HASH }}" > .env
+            echo "BACKUP_PIN_HASH=${{ secrets.BACKUP_PIN_HASH }}" >> .env
             
-            # 4. Build et Up avec héritage des variables (-E)
-            # On utilise le nom du service défini dans ton docker-compose
-            sudo -E docker compose up -d --build signaling-server
+            # 4. Build et relance
+            # On fallback sur docker-compose (v1) si docker compose (v2 plug-in) n'est pas dispo
+            sudo docker compose up -d --build signaling-server || sudo docker-compose up -d --build signaling-server
             
             # 5. Cleanup approfondi pour éviter la saturation du disque
             sudo docker image prune -f
