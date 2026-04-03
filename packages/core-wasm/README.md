@@ -120,3 +120,4 @@ const hash = wasm.crc32_hash(frame); // ex: 0xAABBCCDD
 ```js
 const quality = wasm.check_quality(8000); // "Bitrate actuel: 8000 kbps - Analysé par Rust"
 ```
+
