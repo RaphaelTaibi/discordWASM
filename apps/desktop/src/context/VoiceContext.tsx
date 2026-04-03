@@ -6,11 +6,10 @@ import ChatMessage from '../models/chatMessage.model';
 import ExtendedVoiceState from '../models/extendedVoiceState.model';
 import initWasm, { calculate_network_quality } from '../pkg/core_wasm';
 import { invoke } from '@tauri-apps/api/core';
-
-// IMPORT IMPORTANT : Le plugin WebSocket de Tauri pour bypasser les sécurités WebView
 import WebSocket from '@tauri-apps/plugin-websocket';
 
-const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL;
+const RAW_URL = import.meta.env.VITE_SIGNALING_URL || "wss://127.0.0.1:3001/ws";
+const SIGNALING_URL = RAW_URL.replace(/(^"|"$)/g, '').replace(/(^'|'$)/g, '');
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },

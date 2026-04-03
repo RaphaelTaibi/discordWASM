@@ -8,6 +8,7 @@ export function useTauriUpdater(pollingIntervalMs: number = 20 * 60 * 1000) {
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const checkForUpdate = useCallback(async () => {
+        setUpdateStatus(null);
         try {
             const update = await check();
             if (update) {
@@ -19,6 +20,7 @@ export function useTauriUpdater(pollingIntervalMs: number = 20 * 60 * 1000) {
             }
         } catch (e) {
             setUpdateStatus('Erreur lors de la vérification des mises à jour');
+            setTimeout(() => setUpdateStatus(null), 5000);
         }
     }, []);
 
@@ -36,8 +38,11 @@ export function useTauriUpdater(pollingIntervalMs: number = 20 * 60 * 1000) {
         setUpdateStatus('Installation de la mise à jour...');
         try {
             await updateObj.downloadAndInstall();
+            setUpdateStatus(null);
+            setUpdateAvailable(false);
         } catch (e) {
             setUpdateStatus('Erreur lors de l\'installation de la mise à jour');
+            setTimeout(() => setUpdateStatus(null), 5000);
         }
     };
 
