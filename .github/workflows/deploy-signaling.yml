@@ -18,6 +18,7 @@ jobs:
         run: |
           # On crée l'archive à la racine du workspace
           tar -czvf deploy.tar.gz \
+            --exclude='deploy.tar.gz' \
             --exclude='target' \
             --exclude='node_modules' \
             --exclude='.git' \
