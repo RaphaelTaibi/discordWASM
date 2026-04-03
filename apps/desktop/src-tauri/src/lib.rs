@@ -128,6 +128,7 @@ pub fn run() {
     let ws_connector = tokio_tungstenite::Connector::Rustls(arc_crypto.clone());
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_websocket::Builder::new()
