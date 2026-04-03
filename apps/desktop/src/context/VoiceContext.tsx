@@ -4,8 +4,9 @@ import { ServerSignalMessage } from '../types/serverSignal.type';
 import VoicePeer from '../models/voicePeer.model';
 import ChatMessage from '../models/chatMessage.model';
 import ExtendedVoiceState from '../models/extendedVoiceState.model';
-import { useToast } from './ToastContext';
+//import { useToast } from './ToastContext';
 import initWasm, { calculate_network_quality } from '../pkg/core_wasm';
+import { invoke } from '@tauri-apps/api/core'
 
 const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL
 
@@ -17,7 +18,7 @@ const ICE_SERVERS: RTCIceServer[] = [
 const VoiceContext = createContext<ExtendedVoiceState | undefined>(undefined);
 
 export const VoiceProvider = ({ children }: { children: ReactNode }) => {
-    const { addToast } = useToast();
+    //const { addToast } = useToast();
     const [channelId, setChannelId] = useState<string | null>(null);
     const [participants, setParticipants] = useState<VoicePeer[]>([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -128,22 +129,38 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         return pc;
     }, [sendSignal]);
 
-    const connectSocket = useCallback(() => {
-        if (!userIdRef.current || (socketRef.current && socketRef.current.readyState <= 1)) return;
-        
+    const connectSocket = useCallback(async () => { // Ajout de async ici
+        // On vérifie si on n'est pas déjà en train de se connecter ou déjà connecté
+        if (!userIdRef.current || (socketRef.current && socketRef.current.readyState <= 1)) {
+            return;
+        }
+
+        try {
+            // ÉTAPE DE SÉCURITÉ : On appelle Rust pour valider le certificat Oracle
+            await invoke('call_signaling');
+            console.log("✅ Pinning validé par Rust. Connexion WebSocket...");
+        } catch (err) {
+            console.error("❌ Échec du Pinning : Connexion refusée par sécurité.", err);
+            // Si Rust refuse, on attend un peu avant de réessayer
+            setTimeout(connectSocket, 5000);
+            return;
+        }
+
+        // Création du WebSocket
         const socket = new WebSocket(SIGNALING_URL);
         socketRef.current = socket;
 
         socket.onopen = () => {
             setIsConnected(true);
-            const initialJoin: ClientSignalMessage = { 
-                type: 'join', 
-                channelId: channelIdRef.current || 'global', 
-                userId: userIdRef.current, 
-                username: usernameRef.current 
+            const initialJoin: ClientSignalMessage = {
+                type: 'join',
+                channelId: channelIdRef.current || 'global',
+                userId: userIdRef.current,
+                username: usernameRef.current
             };
             socket.send(JSON.stringify(initialJoin));
 
+            // Envoi des messages en attente (queue)
             while (signalQueueRef.current.length > 0) {
                 const signal = signalQueueRef.current.shift();
                 if (signal) {
@@ -215,15 +232,23 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                         });
                         break;
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.error("Erreur parsing signal:", e);
+            }
         };
 
         socket.onclose = () => {
             setIsConnected(false);
             socketRef.current = null;
+            // Reconnexion automatique toutes les 3 secondes
             setTimeout(connectSocket, 3000);
         };
-    }, [addToast, createPeerConnection, sendSignal]);
+
+        socket.onerror = (e) => {
+            console.error("Erreur WebSocket (SSL probable) :", e);
+        };
+
+    }, [createPeerConnection, sendSignal]);
 
     const setUserInfo = useCallback((username: string, userId: string) => {
         if (!username || !userId) return;

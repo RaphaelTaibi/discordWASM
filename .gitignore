@@ -17,3 +17,7 @@ src-tauri/target/
 .idea/
 .vscode/
 *.swp
+
+#Certificate 
+.cert
+.key

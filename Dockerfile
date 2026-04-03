@@ -36,6 +36,10 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=builder /app/target/release/signaling-server /usr/local/bin/signaling-server
 
+# Acces au certificat auto-signé
+COPY packages/signaling-server/cert.pem .
+COPY packages/signaling-server/key.pem .
+
 # Ports : 3001 pour le Signaling (TCP) et on prépare une plage pour l'audio (UDP)
 EXPOSE 3001
 EXPOSE 10000-10100/udp
