@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'packages/signaling-server/**'
-      - 'packages/core-wasm/**' # Ajoute ici tes autres dépendances internes si besoin
       - '.github/workflows/deploy-signaling.yml'
       - 'Dockerfile'
       - 'docker-compose.yml'
