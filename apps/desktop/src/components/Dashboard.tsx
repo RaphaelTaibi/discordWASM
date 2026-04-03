@@ -14,6 +14,13 @@ import { SidebarView } from '../models/sidebarContentProps.model';
 import { ChatPanel } from './chat/ChatPanel';
 import { UserContextMenu } from './ui/UserContextMenu';
 
+/**
+ * Main application dashboard integrating voice, text chat, and stream viewing.
+ * Acts as a hub for rendering the Sidebar layout and its nested panels depending on
+ * the active selected view (voice vs chat). Manges context menus and global layouts.
+ * 
+ * @returns {JSX.Element} The fully composed dashboard view component.
+ */
 const Dashboard = () => {
     const { username, userId, logout } = useAuth();
     const { stream, metrics, isStreaming, startCapture, stopCapture } = useStreamStore();
@@ -68,6 +75,14 @@ const Dashboard = () => {
         };
     }, [isStreaming, stream, isConnected]);
 
+    /**
+     * Handles opening the context menu for arbitrary connected users on right click.
+     * Prevents the default browser context menu and overrides it with a custom component coordinates.
+     * 
+     * @param {React.MouseEvent} e The related right-click pointer event.
+     * @param {string} userId The target network user's ID.
+     * @param {string} username The target network user's name.
+     */
     const handleContextMenu = (e: React.MouseEvent, userId: string, username: string) => {
         if (userId === localUserId) return;
         e.preventDefault();
@@ -100,11 +115,17 @@ const Dashboard = () => {
         },
     ];
 
+    /**
+     * Executes the process to sever the network connections and clear current local user sessions.
+     */
     const handleLogout = () => {
         leaveChannel();
         logout();
     };
 
+    /**
+     * Starts or stops screen/stream capture depending on the current state.
+     */
     const handleStreamToggle = () => {
         if (isStreaming) {
             stopCapture();

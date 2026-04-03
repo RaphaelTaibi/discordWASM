@@ -20,9 +20,17 @@ const BACKUP_PIN: &str = match option_env!("BACKUP_PIN_HASH") {
 };
 
 #[derive(Debug)]
+/// Custom certificate verifier used to implement SSL pinning.
+/// Validates the server certificate against hardcoded primary and backup PINs.
 struct MyVerifier;
 
 impl ServerCertVerifier for MyVerifier {
+    /// Verifies the end-entity certificate presented by the server.
+    /// Hashes the certificate in DER format using SHA-256 and compares its Base64-encoded
+    /// string representation to the predefined `PRIMARY_PIN` and `BACKUP_PIN`.
+    ///
+    /// Returns `Ok(ServerCertVerified::assertion())` if the hash matches,
+    /// or `Err(Error::InvalidCertificate(...))` in case of a mismatch, preventing potential MITM attacks.
     fn verify_server_cert(
         &self,
         end_entity: &CertificateDer<'_>,
@@ -46,6 +54,8 @@ impl ServerCertVerifier for MyVerifier {
         }
     }
 
+    /// Verifies the TLS 1.2 handshake signature.
+    /// This implementation skips explicit signature verification, assuming the pinning handles trust.
     fn verify_tls12_signature(
         &self,
         _message: &[u8],
@@ -55,6 +65,8 @@ impl ServerCertVerifier for MyVerifier {
         Ok(HandshakeSignatureValid::assertion())
     }
 
+    /// Verifies the TLS 1.3 handshake signature.
+    /// This implementation skips explicit signature verification, assuming the pinning handles trust.
     fn verify_tls13_signature(
         &self,
         _message: &[u8],
@@ -64,6 +76,7 @@ impl ServerCertVerifier for MyVerifier {
         Ok(HandshakeSignatureValid::assertion())
     }
 
+    /// Returns the signature verification schemes supported by this verifier.
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
         vec![
             SignatureScheme::RSA_PSS_SHA256,
@@ -73,6 +86,13 @@ impl ServerCertVerifier for MyVerifier {
     }
 }
 
+/// Invokes the signaling server via an HTTPS GET request.
+/// Utilizes the provided pre-configured `reqwest::Client` injected as a Tauri state,
+/// ensuring that the request honors the custom SSL pinning rules.
+///
+/// # Returns
+/// An `Ok(String)` containing the server's response body text upon success,
+/// or an `Err(String)` containing the TLS/Network error message on failure.
 #[tauri::command]
 async fn call_signaling(client: tauri::State<'_, reqwest::Client>) -> Result<String, String> {
     let res = client.get("https://89.168.59.45:3001/").send().await;
@@ -82,6 +102,9 @@ async fn call_signaling(client: tauri::State<'_, reqwest::Client>) -> Result<Str
     }
 }
 
+/// Main entry point for the Tauri application.
+/// Initializes the default cryptography provider, configures the custom TLS client
+/// with SSL pinning for both HTTP and WebSocket connections, and bootstraps the Tauri application.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Installer le provider Ring

@@ -10,6 +10,15 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/**
+ * Authentication Context Provider.
+ * Manages user state, including login status, persistent username, and a stable generated user ID.
+ * Retrieves initial authentication states from localStorage.
+ * 
+ * @param {Object} props Component properties.
+ * @param {ReactNode} props.children The child components that will consume this context.
+ * @returns {JSX.Element} The Provider component wrapping its children.
+ */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [username, setUsername] = useState<string | null>(
         () => localStorage.getItem('emergency_user')
@@ -26,11 +35,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return id;
     }, [username]);
 
+    /**
+     * Authenticates the user by their name and persists the session.
+     * 
+     * @param {string} name - The user's name to log in with.
+     */
     const login = useCallback((name: string) => {
         localStorage.setItem('emergency_user', name);
         setUsername(name);
     }, []);
 
+    /**
+     * Logs out the current user and clears persistent session data.
+     */
     const logout = useCallback(() => {
         localStorage.removeItem('emergency_user');
         setUsername(null);
@@ -43,6 +60,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+/**
+ * Custom hook to consume the AuthContext.
+ * 
+ * @throws {Error} If called outside of an AuthProvider.
+ * @returns {AuthState} The current authentication state and functions.
+ */
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {

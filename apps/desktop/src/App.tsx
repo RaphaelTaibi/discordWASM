@@ -7,6 +7,13 @@ import { LoginView } from './components/auth/LoginView';
 import { ToastContainer } from './components/ui/ToastContainer';
 import Dashboard from './components/Dashboard';
 
+/**
+ * Root application component that wraps the main interface with necessary context providers.
+ * Sets up authentication, toasts, voice, chat, and stream contexts before rendering
+ * the application content.
+ *
+ * @returns {JSX.Element} The rendered application component hierarchy.
+ */
 export default function App() {
     return (
         <AuthProvider>
@@ -24,6 +31,12 @@ export default function App() {
     );
 }
 
+/**
+ * Renders the main content of the application based on the user's authentication state.
+ * Displays the Dashboard for authenticated users, or the LoginView otherwise.
+ *
+ * @returns {JSX.Element} The conditional view component based on auth state.
+ */
 function AppContent() {
     const { isAuthenticated, login } = useAuth();
     return isAuthenticated ? <Dashboard /> : <LoginView onLogin={login} />;

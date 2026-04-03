@@ -1,0 +1,75 @@
+name: Deploy Signaling Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/signaling-server/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy-signaling.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Archive project for transfer
+        run: |
+          # Create an archive, excluding unnecessary large folders like target/ and node_modules/
+          tar -czvf deploy.tar.gz \
+            --exclude='target' \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='apps/desktop/src-tauri/target' \
+            --exclude='apps/desktop/dist' \
+            .
+
+      - name: Copy archive to Oracle VM
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          source: "deploy.tar.gz"
+          target: "/home/ubuntu/discordWASM-deploy"
+
+      - name: Extract, Build and Restart Docker container
+        uses: appleboy/ssh-action@master
+        env:
+          PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
+          BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          envs: PRIMARY_PIN_HASH,BACKUP_PIN_HASH
+          script: |
+            # Prepare deployment directory
+            mkdir -p ~/discordWASM
+            
+            # Extract the new files
+            cd ~/discordWASM-deploy
+            tar -xzvf deploy.tar.gz -C ~/discordWASM
+            
+            # Move to the project root
+            cd ~/discordWASM
+            
+            # Create/Update .env file containing the secrets required by docker-compose
+            echo "PRIMARY_PIN_HASH=$PRIMARY_PIN_HASH" > .env
+            echo "BACKUP_PIN_HASH=$BACKUP_PIN_HASH" >> .env
+            
+            # Trigger build and deployment using docker-compose
+            # On gère l'alias docker compose vs docker-compose (v1 vs v2)
+            if command -v docker-compose &> /dev/null; then
+              sudo docker-compose --env-file .env up -d --build signaling-server
+            else
+              sudo docker compose --env-file .env up -d --build signaling-server
+            fi
+            
+            # Clean up the deployment archive
+            rm -f ~/discordWASM-deploy/deploy.tar.gz

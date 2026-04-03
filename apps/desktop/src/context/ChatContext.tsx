@@ -6,8 +6,17 @@ import ChatContextValue from '../models/chatContextValue.model';
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'chat_history_main';
-const MAX_MESSAGES = 100; // Limite pour éviter la saturation du localStorage
+const MAX_MESSAGES = 100; // Limite pour viter la saturation du localStorage
 
+/**
+ * Chat component context provider.
+ * Intercepts incoming messages from the VoiceStore (Socket layer) and manages the persistent local chat history.
+ * Ensures the message count does not exceed internal limits while syncing with browser LocalStorage.
+ * 
+ * @param {Object} props Component properties.
+ * @param {ReactNode} props.children Child elements inheriting the context.
+ * @returns {JSX.Element} The Provider component wrapping its children.
+ */
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const { chatMessages: socketMessages, sendChatMessage: sendViaSocket } = useVoiceStore();
     const [persistedMessages, setPersistedMessages] = useState<ChatMessage[]>([]);
@@ -52,10 +61,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         });
     }, [socketMessages]);
 
+    /**
+     * Dispatch a chat message to the network through the underlying socket system.
+     * 
+     * @param {string} message The text content of the message to broadcast.
+     */
     const sendChatMessage = useCallback((message: string) => {
         sendViaSocket(message);
     }, [sendViaSocket]);
 
+    /**
+     * Clears all recorded message history both in current memory and localStorage.
+     */
     const clearHistory = useCallback(() => {
         localStorage.removeItem(STORAGE_KEY);
         setPersistedMessages([]);
@@ -68,6 +85,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+/**
+ * Custom hook to safely grab the current Chat context, including messages and dispatch functions.
+ * 
+ * @throws {Error} Throws an error if invoked outside of a valid ChatProvider subtree.
+ * @returns {ChatContextValue} The fully initialized chat state context values.
+ */
 export const useChatStore = () => {
     const context = useContext(ChatContext);
     if (!context) throw new Error('useChatStore must be used within ChatProvider');
