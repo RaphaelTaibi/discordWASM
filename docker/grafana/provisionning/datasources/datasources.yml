@@ -14,5 +14,5 @@ datasources:
   - name: Alertmanager
     type: alertmanager
     access: proxy
-    url: http://alertmanager:9093
+    url: http://89.168.59.45:9093
     editable: false
