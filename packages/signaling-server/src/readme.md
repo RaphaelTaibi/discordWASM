@@ -24,39 +24,7 @@ Serveur de signalisation WebRTC haute performance écrit en Rust pour des commun
 ---
 
 ## 🏗️ Architecture
-
-┌─────────────────────────────────────────────────────────────┐
-│ VM Oracle Cloud (ARM) │
-├─────────────────────────────────────────────────────────────┤
-│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
-│ │ Prometheus │ │ Grafana │ │Alertmanager │ │
-│ │ :9090 │ │ :3000 │ │ :9093 │ │
-│ └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ │
-│ │ │ │ │
-│ └──────────────────┼──────────────────┘ │
-│ │ │
-│ ┌─────────────────────────┴─────────────────────────┐ │
-│ │ Signaling Server Rust │ │
-│ │ (axum-server) │ │
-│ │ :3001/HTTPS │ │
-│ │ :3001/metrics │ │
-│ └─────────────────────────┬─────────────────────────┘ │
-│ │ │
-│ ┌─────────────────────────┴─────────────────────────┐ │
-│ │ Node Exporter │ │
-│ │ :9100 │ │
-│ └───────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-│
-▼
-┌─────────────────┐
-│ Client Tauri │
-│ (.exe) │
-│ Certificate │
-│ Pinning │
-└─────────────────┘
-
-
+![img.png](img.png)
 ---
 
 ## ✨ Fonctionnalités
@@ -451,6 +419,54 @@ if cert_hash != expected_hash {
 | **Pairs Maximaux** | 100+ par salon |
 | **Codec Audio** | Opus (48kHz) |
 | **Codec Vidéo** | VP8/VP9/H.264 |
+
+## **🧮 Calcule théorique**
+**Voici les facteurs déterminants pour estimer la capacité :**
+
+# **1. Bande Passante (Facteur Limitant Principal)**
+```plaintext
+Bande Passante Totale : 1 Gbps = 1,000,000,000 bps
+
+Par Pair (Estimation) :
+- Audio (Opus 48kHz) : ~64 kbps
+- Vidéo (VP8 720p) : ~500-1000 kbps
+
+Pour Audio uniquement :
+1,000,000,000 / 64,000 = ~15,625 pairs
+
+Pour Vidéo 720p :
+1,000,000,000 / 750,000 = ~1,333 pairs
+```
+
+# **2. CPU (ARM 4 Cœurs)**
+```plaintext
+WebRTC SFU : Le CPU gère le forwarding des paquets RTP (sans décoder)
+
+Estimation :
+- 1 pair audio : ~2-5% CPU
+- 1 pair vidéo : ~10-20% CPU
+
+Pour 4 cœurs ARM :
+- Audio uniquement : ~100-200 pairs
+- Vidéo 720p : ~20-50 pairs
+```
+3. Mémoire (24 GB)
+```plaintext
+Par Pair (Estimation) :
+- Connexion WebSocket : ~1-2 MB
+- Buffer RTP : ~5-10 MB
+- RTCPeerConnection : ~10-20 MB
+
+Total par pair : ~20-30 MB
+
+24 GB / 25 MB = ~960 pairs max (théorique)
+```
+
+| Configuration | Pairs Maximaux par Salon | Salons Simultanés |
+|---------------|--------------------------|-------------------|
+| **Audio uniquement** | 100-200 | 5-10 |
+| **Vidéo 720p** | 20-50 | 3-5 |
+| **Mixte (Audio + Vidéo)** | 50-100 | 3-5 |
 
 ## **Optimisations**
 
