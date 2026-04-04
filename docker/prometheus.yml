@@ -16,13 +16,12 @@ rule_files:
   - "alert_rules.yml"
 
 scrape_configs:
-  # ⚠️ IMPORTANT: Utiliser host.docker.internal car signaling-server est en network_mode: host
   - job_name: 'signaling-server'
     scheme: 'https'
     tls_config:
       insecure_skip_verify: true
     static_configs:
-      - targets: ['host.docker.internal:3001']  # ← Pas 'signaling-server:3001'
+      - targets: ['signaling-server:3001']  # ← Nom du conteneur
     metrics_path: '/metrics'
     scrape_interval: 5s
 
@@ -34,7 +33,6 @@ scrape_configs:
     static_configs:
       - targets: ['alertmanager:9093']
 
-  # Optionnel : Node Exporter pour les métriques système
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['host.docker.internal:9100']
+      - targets: ['localhost:9100']  # ← Nom du conteneur

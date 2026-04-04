@@ -1,7 +1,6 @@
 groups:
   - name: sfu_alerts
     rules:
-      # Règle 1: Nombre de pairs connectés
       - alert: HighPeerCount
         expr: sfu_active_peers > 100
         for: 5m
@@ -11,7 +10,6 @@ groups:
           summary: "Nombre élevé de pairs connectés"
           description: "Le nombre de pairs connectés est de {{ $value }} (seuil: 100)"
 
-      # Règle 2: Utilisation de bande passante élevée
       - alert: HighBandwidthUsage
         expr: sfu_bandwidth_egress_bps > 50000000
         for: 5m
@@ -21,7 +19,6 @@ groups:
           summary: "Utilisation de bande passante élevée"
           description: "La bande passante sortante est de {{ $value }} bits/s (seuil: 50 Mbps)"
 
-      # Règle 3: Nombre de paquets par seconde élevé
       - alert: HighPacketRate
         expr: sfu_packets_per_second > 10000
         for: 5m
@@ -31,7 +28,6 @@ groups:
           summary: "Taux de paquets élevé"
           description: "Le taux de paquets est de {{ $value }} packets/s (seuil: 10000)"
 
-      # Règle 4: Nombre de salons actifs élevé
       - alert: HighChannelCount
         expr: sfu_active_channels > 50
         for: 5m
@@ -41,7 +37,6 @@ groups:
           summary: "Nombre élevé de salons actifs"
           description: "Le nombre de salons actifs est de {{ $value }} (seuil: 50)"
 
-      # Règle 5: Backend down
       - alert: BackendDown
         expr: up{job="signaling-server"} == 0
         for: 1m
