@@ -63,7 +63,7 @@ jobs:
           cp Dockerfile deploy-package/
           cp docker-compose.yml deploy-package/
           
-          # 2. Recherche et copie intelligente des configs (évite les erreurs de chemins)
+          # 2. Recherche et copie des configs (évite les erreurs de chemins dans le repo)
           find . -name "prometheus.yml" -exec cp {} deploy-package/docker/ \;
           find . -name "alert_rules.yml" -exec cp {} deploy-package/docker/ \;
           find . -name "alertmanager.yml" -exec cp {} deploy-package/docker/ \;
@@ -73,8 +73,7 @@ jobs:
           find . -name "dashboard.yml" -exec cp {} deploy-package/docker/grafana/provisioning/dashboards/ \;
           find . -name "sfu-dashboard.json" -exec cp {} deploy-package/docker/grafana/provisioning/dashboards/ \;
 
-          # Vérification visuelle dans les logs de la CI
-          echo "Vérification de la structure du paquet :"
+          echo "Vérification du contenu du paquet :"
           ls -R deploy-package/docker/
           
           tar -czvf deploy.tar.gz -C deploy-package .
@@ -99,11 +98,16 @@ jobs:
             mkdir -p ~/discordWASM
             cd ~/discordWASM
             
-            # Extraction propre
+            # 🔥 1. RÉPARATION DES PERMISSIONS (Résout le Permission Denied)
+            # Docker crée des dossiers en root, on doit les reprendre pour l'utilisateur ubuntu
+            sudo chown -R ubuntu:ubuntu ~/discordWASM
+            
+            # 2. Nettoyage et extraction propre
+            rm -rf docker/
             tar -xzvf ~/deploy.tar.gz
             rm ~/deploy.tar.gz
 
-            # 1. Création du fichier .env
+            # 3. Création du fichier .env
             cat > .env << ENVEOF
             PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
             BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
@@ -112,7 +116,7 @@ jobs:
             ENVEOF
             chmod 600 .env
 
-            # 2. Patch dynamique d'Alertmanager
+            # 4. Patch dynamique d'Alertmanager
             sed -i "s|REPLACE_SMTP_USER|${{ secrets.SMTP_EMAIL }}|g" docker/alertmanager.yml
             sed -i "s|REPLACE_SMTP_PASSWORD|${{ secrets.SMTP_AUTH_PASSWORD }}|g" docker/alertmanager.yml
             sed -i "s|REPLACE_SLACK_WEBHOOK|${{ secrets.SLACK_WEBHOOK_URL }}|g" docker/alertmanager.yml
@@ -127,7 +131,7 @@ jobs:
             sudo docker compose build --no-cache signaling-server
             sudo docker compose up -d
 
-            echo "Attente de 30s..."
+            echo "Attente de démarrage..."
             sleep 30
 
             echo "=== Tests de santé ==="
