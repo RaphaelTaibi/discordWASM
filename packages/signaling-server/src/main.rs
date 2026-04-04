@@ -64,6 +64,13 @@ static BANDWIDTH_EGRESS: Lazy<IntGauge> = Lazy::new(|| {
     ).unwrap()
 });
 
+static BANDWIDTH_INGRESS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "sfu_bandwidth_ingress_bps",
+        "Bande passante entrante (bits/s)"
+    ).unwrap()
+});
+
 static PACKETS_PER_SEC: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "sfu_packets_per_second",
@@ -509,6 +516,14 @@ async fn prometheus_handler(state: axum::extract::State<Arc<AppState>>) -> Strin
         }
     }
     BANDWIDTH_EGRESS.set(total_bandwidth as i64);
+
+    let mut total_ingress: u64 = 0;
+    for channel in channels.values() {
+        for stats in channel.stats.values() {
+            total_ingress +=  stats.bandwidth_bps();
+        }
+    }
+    BANDWIDTH_INGRESS.set(total_ingress as i64);
 
     // Encode metrics
     let encoder = TextEncoder::new();
