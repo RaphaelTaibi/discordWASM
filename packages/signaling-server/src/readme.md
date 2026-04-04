@@ -20,14 +20,16 @@ Serveur de signalisation WebRTC haute performance écrit en Rust pour des commun
 - [API WebSocket](#api-websocket)
 - [Sécurité](#sécurité)
 - [Performance](#performance)
+- [Dépannage](#dépannage)
+- [Ressources](#ressources)
 
 ---
 
-## 🏗️ Architecture
+# 🏗️ Architecture
 ![img.png](img.png)
 ---
 
-## ✨ Fonctionnalités
+# ✨ Fonctionnalités
 
 | Fonctionnalité | Description |
 |----------------|-------------|
@@ -44,7 +46,7 @@ Serveur de signalisation WebRTC haute performance écrit en Rust pour des commun
 
 ---
 
-## 📦 Prérequis
+# 📦 Prérequis
 
 ### Système
 
@@ -68,7 +70,7 @@ curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 ```
 
-# 🚀 Installation
+# **🚀 Installation**
 
 ## **1. Cloner le Repository**
 
@@ -104,7 +106,7 @@ cargo run
 ./target/release/signaling-server
 ```
 
-## **⚙️ Configuration**
+# **⚙️ Configuration**
 
 Variables d'Environnement
 ```bash
@@ -218,7 +220,7 @@ docker compose logs -f signaling-server
 # Arrêter les services
 docker compose down
 ```
-**📊 Monitoring**
+# **📊 Monitoring**
 
 Métriques Exposées
 
