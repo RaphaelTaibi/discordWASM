@@ -1,10 +1,11 @@
 global:
   resolve_timeout: 5m
   smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: '${DOMAIN}'
-  smtp_auth_username: '${SMTP_EMAIL}'
-  smtp_auth_password: '${SMTP_AUTH_PASSWORD}'
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  smtp_from: 'REPLACE_DOMAIN'
+  smtp_auth_username: 'REPLACE_SMTP_EMAIL'
+  smtp_auth_password: 'REPLACE_SMTP_PASSWORD'
+  slack_api_url: 'REPLACE_SLACK_WEBHOOK'
+
 
 route:
   receiver: 'email-default'

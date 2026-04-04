@@ -68,8 +68,6 @@ jobs:
           cp -r docker deploy-package/
           cp .env.example deploy-package/.env.example 2>/dev/null || echo "No .env.example"
           tar -czvf deploy.tar.gz -C deploy-package .
-          echo "=== Contenu du tarball ==="
-          tar -tzvf deploy.tar.gz | head -20
 
       - name: Copy to Oracle VM
         uses: appleboy/scp-action@master
@@ -90,10 +88,14 @@ jobs:
             echo "=== Déploiement SFU + Monitoring ==="
             mkdir -p ~/discordWASM
             cd ~/discordWASM
+            
+            # Nettoyage et extraction
             rm -f signaling-server
             tar -xzvf ~/deploy.tar.gz
             rm ~/deploy.tar.gz
-            echo "Chargement des secrets..."
+
+            # 1. Création du fichier .env pour le backend Rust
+            echo "Chargement des secrets environnement..."
             cat > .env << ENVEOF
             PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
             BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
@@ -101,56 +103,63 @@ jobs:
             SLACK_WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
             ENVEOF
             chmod 600 .env
-            echo "=== Contenu du fichier .env ==="
-            cat .env | sed 's/=.*/="***"/'
-            echo "Arrêt des anciens services..."
+
+            # 2. Injection des secrets dans Alertmanager (CORRECTION ERREUR CONFIG)
+            # On utilise '|' car les URLs contiennent des '/'
+            echo "Patching Alertmanager config..."
+            sed -i "s|REPLACE_SMTP_USER|${{ secrets.SMTP_EMAIL }}|g" docker/alertmanager.yml
+            sed -i "s|REPLACE_SMTP_PASSWORD|${{ secrets.SMTP_AUTH_PASSWORD }}|g" docker/alertmanager.yml
+            sed -i "s|REPLACE_SLACK_WEBHOOK|${{ secrets.SLACK_WEBHOOK_URL }}|g" docker/alertmanager.yml
+            sed -i "s|REPLACE_DOMAIN|${{ secrets.DOMAIN }}|g" docker/alertmanager.yml
+
+            echo "Relance des services Docker..."
             sudo docker compose --env-file .env down || true
-            echo "Build et démarrage des services..."
             sudo docker compose --env-file .env build --no-cache signaling-server
             sudo docker compose --env-file .env up -d
-            echo "Attente du démarrage des services..."
+
+            echo "Attente du démarrage des services (30s)..."
             sleep 30
+
             echo "=== Vérification des services ==="
+            # Backend
             if curl -fk --max-time 10 https://localhost:3001/health; then
-              echo " Signaling Server: OK"
+              echo "✅ Signaling Server: OK"
             else
-              echo " Signaling Server: FAILED"
+              echo "❌ Signaling Server: FAILED"
               sudo docker compose --env-file .env logs --tail=50 signaling-server
               exit 1
             fi
+
+            # Prometheus
             if curl -s --max-time 10 http://localhost:9090/-/healthy | grep -q "Prometheus Server is Healthy"; then
-              echo " Prometheus: OK"
+              echo "✅ Prometheus: OK"
             else
-              echo " Prometheus: FAILED"
+              echo "❌ Prometheus: FAILED"
               sudo docker compose --env-file .env logs --tail=50 prometheus
               exit 1
             fi
+
+            # Grafana
             if curl -s --max-time 10 http://localhost:3000/api/health | grep -q "ok"; then
-              echo " Grafana: OK"
+              echo "✅ Grafana: OK"
             else
-              echo " Grafana: FAILED"
+              echo "❌ Grafana: FAILED"
               sudo docker compose --env-file .env logs --tail=50 grafana
               exit 1
             fi
+
+            # Alertmanager
             if curl -s --max-time 10 http://localhost:9093/-/healthy | grep -q "Healthy"; then
-              echo "Alertmanager: OK"
+              echo "✅ Alertmanager: OK"
             else
-              echo "Alertmanager: FAILED"
+              echo "❌ Alertmanager: FAILED"
               sudo docker compose --env-file .env logs --tail=50 alertmanager
               exit 1
             fi
-            echo "=== Vérification des targets Prometheus ==="
-            curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job == "signaling-server") | {job: .labels.job, health: .health, scrapeUrl: .scrapeUrl}' || true
-            echo "=== Nettoyage ==="
+
+            echo "=== Nettoyage Docker ==="
             sudo docker image prune -f
-            sudo docker system prune -f
-            echo "=== Déploiement terminé ==="
-            echo "URLs d'accès:"
-            echo "  - SFU Backend:  https://${{ secrets.ORACLE_HOST }}:3001"
-            echo "  - Prometheus:   http://${{ secrets.ORACLE_HOST }}:9090"
-            echo "  - Grafana:      http://${{ secrets.ORACLE_HOST }}:3000"
-            echo "  - Alertmanager: http://${{ secrets.ORACLE_HOST }}:9093"
-            echo " Déploiement réussi !"
+            echo "🚀 Déploiement réussi !"
 
   notify:
     needs: build-and-deploy
@@ -163,7 +172,6 @@ jobs:
           status: ${{ job.status }}
           text: |
             :robot: Déploiement SFU + Monitoring
-            :rocket: *Workflow:* ${{ github.workflow }}
+            :rocket: *Statut:* ${{ job.status }}
             :book: *Commit:* ${{ github.event.head_commit.message }}
-            :person: *Author:* ${{ github.actor }}
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
