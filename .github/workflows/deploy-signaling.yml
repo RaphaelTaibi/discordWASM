@@ -162,4 +162,5 @@ jobs:
             :robot: Déploiement SFU + Monitoring
             :rocket: *Statut:* ${{ job.status }}
             :book: *Commit:* ${{ github.event.head_commit.message }}
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
