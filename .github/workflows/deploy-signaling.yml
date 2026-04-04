@@ -71,9 +71,12 @@ jobs:
             tar -xzvf ~/deploy.tar.gz -C ~/discordWASM
             cd ~/discordWASM
             
-            # 4. Relance Docker (Build instantané car binaire présent)
+            # 4. Arrêt de l'ancien conteneur
+            sudo docker compose down
+            
+            # 5. Relance Docker (Build instantané car binaire présent)
             sudo docker compose up -d --build signaling-server
             
-            # 5. Ménage
+            # 6. Ménage
             rm ~/deploy.tar.gz
             sudo docker image prune -f
