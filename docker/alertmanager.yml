@@ -1,10 +1,10 @@
 global:
   resolve_timeout: 5m
   smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'alerts@ton-domain.com'
-  smtp_auth_username: 'ton-email@gmail.com'
-  smtp_auth_password: 'ton-app-password'
-  slack_api_url: 'https://hooks.slack.com/services/TON/WEBHOOK/URL'
+  smtp_from: '${DOMAIN}'
+  smtp_auth_username: '${SMTP_EMAIL}'
+  smtp_auth_password: '${SMTP_AUTH_PASSWORD}'
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
 
 route:
   receiver: 'email-default'

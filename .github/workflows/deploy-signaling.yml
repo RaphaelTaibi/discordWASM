@@ -9,7 +9,7 @@ on:
       - '.github/workflows/deploy-signaling.yml'
       - 'Dockerfile'
       - 'docker-compose.yml'
-      - 'docker/**'  # ← Ajout pour monitoring
+      - 'docker/**'
   workflow_dispatch:
 
 env:
@@ -18,7 +18,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # ⚠️ x86_64 runner
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,36 +52,36 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --target ${{ env.TARGET_PLATFORM }} -p signaling-server
 
-      - name: Verify Binary
+      - name: Verify Binary (file command only)
         run: |
+          echo "=== Vérification du binaire ==="
           file target/${{ env.TARGET_PLATFORM }}/release/signaling-server
-          ldd target/${{ env.TARGET_PLATFORM }}/release/signaling-server
+          ls -lh target/${{ env.TARGET_PLATFORM }}/release/signaling-server
+          # ⚠️ NE PAS EXÉCUTER LE BINAIRE ICI (x86_64 runner)
 
       - name: Prepare Deployment Package
         run: |
           echo "Creating deployment package..."
           
-          # Structure du tarball
           mkdir -p deploy-package
           
-          # Binaire
+          # Binaire ARM64
           cp target/${{ env.TARGET_PLATFORM }}/release/signaling-server deploy-package/
           
           # Docker files
           cp Dockerfile deploy-package/
           cp docker-compose.yml deploy-package/
           
-          # Monitoring stack (docker/)
+          # Monitoring stack
           cp -r docker deploy-package/
           
-          # .env template (sans secrets)
+          # .env template
           cp .env.example deploy-package/.env.example 2>/dev/null || echo "No .env.example"
           
           # Créer le tarball
-          tar -czvf deploy.tar.gz \
-            -C deploy-package .
+          tar -czvf deploy.tar.gz -C deploy-package .
           
-          # Afficher le contenu
+          echo "=== Contenu du tarball ==="
           tar -tzvf deploy.tar.gz | head -20
 
       - name: Copy to Oracle VM
@@ -114,7 +114,7 @@ jobs:
             tar -xzvf ~/deploy.tar.gz
             rm ~/deploy.tar.gz
             
-            # 4. Charger les secrets depuis GitHub
+            # 4. Charger les secrets
             echo "Chargement des secrets..."
             cat > .env << EOF
             PRIMARY_PIN_HASH=${{ secrets.PRIMARY_PIN_HASH }}
@@ -128,19 +128,19 @@ jobs:
             echo "Arrêt des anciens services..."
             sudo docker compose down || true
             
-            # 6. Build et démarrage des services
+            # 6. Build et démarrage
             echo "Build et démarrage des services..."
             sudo docker compose build --no-cache signaling-server
             sudo docker compose up -d
             
-            # 7. Attendre le démarrage (30 secondes)
-            echo "Attente du démarrage des services..."
+            # 7. Attendre le démarrage
+            echo "Attente du démarrage..."
             sleep 30
             
             # 8. Healthcheck
             echo "=== Vérification des services ==="
             
-            # Vérifier le backend
+            # Backend
             if curl -fk --max-time 10 https://localhost:3001/health; then
               echo "✅ Signaling Server: OK"
             else
@@ -149,7 +149,7 @@ jobs:
               exit 1
             fi
             
-            # Vérifier Prometheus
+            # Prometheus
             if curl -s --max-time 10 http://localhost:9090/-/healthy | grep -q "Prometheus Server is Healthy"; then
               echo "✅ Prometheus: OK"
             else
@@ -158,7 +158,7 @@ jobs:
               exit 1
             fi
             
-            # Vérifier Grafana
+            # Grafana
             if curl -s --max-time 10 http://localhost:3000/api/health | grep -q "ok"; then
               echo "✅ Grafana: OK"
             else
@@ -167,7 +167,7 @@ jobs:
               exit 1
             fi
             
-            # Vérifier Alertmanager
+            # Alertmanager
             if curl -s --max-time 10 http://localhost:9093/-/healthy | grep -q "Healthy"; then
               echo "✅ Alertmanager: OK"
             else
@@ -176,14 +176,13 @@ jobs:
               exit 1
             fi
             
-            # 9. Vérifier les targets Prometheus
-            echo "=== Vérification des targets Prometheus ==="
-            curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job == "signaling-server") | {job: .labels.job, health: .health, scrapeUrl: .scrapeUrl}' || true
+            # 9. Vérifier Prometheus targets
+            echo "=== Prometheus targets ==="
+            curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job == "signaling-server") | {job: .labels.job, health: .health}' || true
             
             # 10. Ménage
             echo "=== Nettoyage ==="
             sudo docker image prune -f
-            sudo docker system prune -f
             
             # 11. Résumé
             echo "=== Déploiement terminé ==="
@@ -209,6 +208,5 @@ jobs:
             :rocket: *Workflow:* ${{ github.workflow }}
             :book: *Commit:* ${{ github.event.head_commit.message }}
             :person: *Author:* ${{ github.actor }}
-            :clock: *Duration:* ${{ job.status }}
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure() || success()
