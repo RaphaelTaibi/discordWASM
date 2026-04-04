@@ -57,8 +57,7 @@ services:
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
     depends_on:
       - prometheus
-    networks:
-      - discordwasm-network
+    network_mode: "host" # Permet d'accéder à localhost:9090 pour Prometheus
 
   alertmanager:
     image: prom/alertmanager:v0.26.0
@@ -72,8 +71,7 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
     restart: unless-stopped
-    networks:
-      - discordwasm-network
+    network_mode: "host" # Permet d'accéder à localhost:9090 pour Prometheus
 
   node-exporter:
     image: prom/node-exporter:latest
