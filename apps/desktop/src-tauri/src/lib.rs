@@ -102,8 +102,8 @@ impl ServerCertVerifier for MyVerifier {
 /// An `Ok(String)` containing the server's response body text upon success,
 /// or an `Err(String)` containing the TLS/Network error message on failure.
 #[tauri::command]
-async fn call_signaling(client: tauri::State<'_, reqwest::Client>) -> Result<String, String> {
-    let res = client.get("https://89.168.59.45:3001/").send().await;
+async fn call_signaling(client: tauri::State<'_, reqwest::Client>, url: String) -> Result<String, String> {
+    let res = client.get(&url).send().await;
     match res {
         Ok(resp) => Ok(resp.text().await.map_err(|e| e.to_string())?),
         Err(e) => Err(format!("Erreur TLS : {}", e)),

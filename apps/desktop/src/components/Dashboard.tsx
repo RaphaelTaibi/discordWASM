@@ -8,7 +8,7 @@ import { VoiceAudioRenderer } from './stream/VoiceAudioRenderer';
 import { SidebarContent } from './sidebar/SidebarContent';
 import UserFooter from './sidebar/UserFooter';
 import { useVoiceActivity } from '../hooks/useVoiceActivity';
-import { Headphones } from 'lucide-react';
+import { Headphones, Video } from 'lucide-react';
 import { useTauriUpdater } from '../lib/useTauriUpdater';
 import { SidebarView } from '../models/sidebarContentProps.model';
 import { ChatPanel } from './chat/ChatPanel';
@@ -33,6 +33,7 @@ const Dashboard = () => {
         error,
         localUserId,
         localStream,
+        channelStartedAt,
         joinChannel,
         leaveChannel,
         toggleMute,
@@ -50,6 +51,7 @@ const Dashboard = () => {
 
     const [activeView, setActiveView] = useState<SidebarView>('voice');
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, userId: string, username: string } | null>(null);
+    const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
     
     // Synchroniser les infos utilisateur avec le VoiceStore dès l'arrivée sur le Dashboard
     useEffect(() => {
@@ -156,6 +158,8 @@ const Dashboard = () => {
                     localUserId={localUserId}
                     activeView={activeView}
                     onViewChange={setActiveView}
+                    speakingUsers={speakingUsers}
+                    channelStartedAt={channelStartedAt}
                 />
             }
             sidebarFooter={
@@ -181,93 +185,189 @@ const Dashboard = () => {
             {activeView === 'chat' ? (
                 <ChatPanel />
             ) : (
-                <div className={`grid gap-3 ${
-                    stageCards.length === 1 ? 'grid-cols-1' :
-                    stageCards.length <= 4 ? 'grid-cols-1 xl:grid-cols-2' :
-                    'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-                }`}>
-                    {stageCards.map((card) => {
-                        const isSpeaking = speakingUsers.get(card.id) ?? false;
-
-                        if (card.id === localUserId) {
-                            if (isStreaming && stream) {
-                                return (
-                                    <div key={card.id} className="relative">
-                                        <StreamCard
-                                            stream={stream}
-                                            username={safeUsername}
-                                            isBright={metrics.lum > 220}
-                                            isSpeaking={isSpeaking}
-                                        />
-                                        {isDeafened && (
-                                            <div
-                                                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-500 border-2 border-[#232428] inline-flex items-center justify-center shadow-md"
-                                                aria-label="Son entrant coupé"
-                                                title="Son entrant coupé"
-                                            >
-                                                <Headphones size={13} className="text-white" />
+                <div className={`flex flex-col h-full gap-3 ${focusedUserId ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                    {focusedUserId && (
+                        <div className="flex-1 min-h-0 w-full bg-black rounded-lg overflow-hidden flex items-center justify-center relative shadow-lg">
+                            <button 
+                                className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/80 text-white rounded px-3 py-1 backdrop-blur-sm transition-colors"
+                                onClick={() => setFocusedUserId(null)}
+                            >
+                                Réduire
+                            </button>
+                            {stageCards.filter(c => c.id === focusedUserId).map((card) => {
+                                const isSpeaking = speakingUsers.get(card.id) ?? false;
+                                
+                                if (card.id === localUserId) {
+                                    if (isStreaming && stream) {
+                                        return (
+                                            <div key={`focus-${card.id}`} className="w-full h-full flex items-center justify-center">
+                                                <StreamCard
+                                                    stream={stream}
+                                                    username={safeUsername}
+                                                    isBright={metrics.lum > 220}
+                                                    isSpeaking={isSpeaking}
+                                                />
                                             </div>
+                                        );
+                                    } else {
+                                        return (
+                                            <div key={`focus-${card.id}`} className="w-full h-full flex flex-col items-center justify-center text-white">
+                                                <div className={`w-32 h-32 rounded-full bg-[#3f4147] flex items-center justify-center text-5xl font-bold mb-4 ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}`}>
+                                                    {safeUsername.slice(0, 1).toUpperCase()}
+                                                </div>
+                                                <span className="text-2xl font-semibold">{safeUsername}</span>
+                                            </div>
+                                        );
+                                    }
+                                }
+
+                                const remoteVideo = remoteVideoStreams.get(card.id);
+                                if (remoteVideo) {
+                                    return (
+                                        <div key={`focus-${card.id}`} className="w-full h-full flex items-center justify-center">
+                                            <StreamCard
+                                                stream={remoteVideo}
+                                                username={card.username}
+                                                isSpeaking={isSpeaking}
+                                            />
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div key={`focus-${card.id}`} className="w-full h-full flex flex-col items-center justify-center text-white">
+                                        <div className={`w-32 h-32 rounded-full bg-[#3f4147] flex items-center justify-center text-5xl font-bold mb-4 ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}`}>
+                                            {card.username.slice(0, 1).toUpperCase()}
+                                        </div>
+                                        <span className="text-2xl font-semibold">{card.username}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    
+                    <div className={focusedUserId 
+                        ? "h-48 flex-shrink-0 flex gap-2 overflow-x-auto overflow-y-hidden pb-2 snap-x" 
+                        : `grid gap-3 ${
+                            stageCards.length === 1 ? 'grid-cols-1' :
+                            stageCards.length <= 4 ? 'grid-cols-1 xl:grid-cols-2' :
+                            'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+                        }`
+                    }>
+                        {stageCards.map((card) => {
+                            const isSpeaking = speakingUsers.get(card.id) ?? false;
+                            
+                            const cardClassName = focusedUserId
+                                ? `relative flex-shrink-0 w-64 h-full rounded-lg overflow-hidden bg-[#232428] border border-black/30 transition-all duration-300 hover:scale-[1.02] cursor-pointer snap-center ${focusedUserId === card.id ? 'ring-2 ring-blue-500' : ''}`
+                                : "relative flex flex-col items-center justify-center aspect-video w-full rounded-lg overflow-hidden bg-[#232428] border border-black/30 transition-all duration-300 hover:scale-[1.01] cursor-pointer";
+
+                            const handleCardClick = () => setFocusedUserId(card.id);
+
+                            if (card.id === localUserId) {
+                                if (isStreaming && stream) {
+                                    return (
+                                        <div key={card.id} className={cardClassName} onClick={handleCardClick}>
+                                            {focusedUserId === card.id ? (
+                                                <>
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-[#1e1f22]">
+                                                        <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-[#3f4147] text-white text-xl font-bold transition-all duration-300 ${
+                                                            isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
+                                                        }`}>
+                                                            {safeUsername.slice(0, 1).toUpperCase()}
+                                                            <div className="absolute -bottom-1 -right-1 bg-[#1e1f22] rounded-full p-1 border-2 border-[#232428]">
+                                                                <Video size={12} className="text-white" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-white">{safeUsername}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <StreamCard
+                                                    stream={stream}
+                                                    username={safeUsername}
+                                                    isBright={metrics.lum > 220}
+                                                    isSpeaking={isSpeaking}
+                                                />
+                                            )}
+                                            {isDeafened && (
+                                                <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-500 border-2 border-[#232428] inline-flex items-center justify-center shadow-md z-10">
+                                                    <Headphones size={13} className="text-white" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                } else {
+                                    return (
+                                        <div key={card.id} className={cardClassName} onClick={handleCardClick}>
+                                            <div className="flex flex-col items-center justify-center w-full h-full">
+                                                <div className={`${focusedUserId ? 'w-16 h-16 text-2xl' : 'w-24 h-24 text-4xl'} rounded-full bg-[#3f4147] text-white flex items-center justify-center font-bold mb-2`}>
+                                                    {safeUsername.slice(0, 1).toUpperCase()}
+                                                </div>
+                                                <span className={`${focusedUserId ? 'text-sm' : 'text-lg'} font-semibold text-gray-200`}>{safeUsername}</span>
+                                                {!focusedUserId && <span className="text-xs text-gray-400 mt-1">Aucun stream en cours</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                            }
+
+                            const remoteVideo = remoteVideoStreams.get(card.id);
+
+                            if (remoteVideo) {
+                                return (
+                                    <div key={card.id} className={cardClassName} onClick={handleCardClick} onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}>
+                                        {focusedUserId === card.id ? (
+                                            <>
+                                                <div className="absolute inset-0 flex items-center justify-center bg-[#1e1f22]">
+                                                    <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-[#3f4147] text-white text-xl font-bold transition-all duration-300 ${
+                                                        isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
+                                                    }`}>
+                                                        {card.username.slice(0, 1).toUpperCase()}
+                                                        <div className="absolute -bottom-1 -right-1 bg-[#1e1f22] rounded-full p-1 border-2 border-[#232428]">
+                                                            <Video size={12} className="text-white" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-white">{card.username}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <StreamCard
+                                                stream={remoteVideo}
+                                                username={card.username}
+                                                isSpeaking={isSpeaking}
+                                            />
                                         )}
                                     </div>
                                 );
-                            } else {
-                                return (
-                                    <div key={card.id} className="relative flex flex-col items-center justify-center aspect-video rounded-lg overflow-hidden bg-[#232428] border border-black/30">
-                                        <div className="flex flex-col items-center justify-center w-full h-full">
-                                            <div className="w-24 h-24 rounded-full bg-[#3f4147] text-white flex items-center justify-center text-4xl font-bold mb-2">
-                                                {safeUsername.slice(0, 1).toUpperCase()}
-                                            </div>
-                                            <span className="text-lg font-semibold text-gray-200">{safeUsername}</span>
-                                            <span className="text-xs text-gray-400 mt-1">Aucun stream en cours</span>
+                            }
+
+                            return (
+                                <div 
+                                    key={card.id} 
+                                    onClick={handleCardClick}
+                                    onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}
+                                    className={`${cardClassName} !bg-[#1e1f22]`}
+                                >
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className={`${focusedUserId ? 'w-16 h-16 text-xl' : 'w-20 h-20 text-2xl'} rounded-full bg-[#3f4147] text-white flex items-center justify-center font-bold transition-all duration-300 ${
+                                            isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
+                                        }`}>
+                                            {card.username.slice(0, 1).toUpperCase()}
                                         </div>
                                     </div>
-                                );
-                            }
-                        }
-
-                        const remoteVideo = remoteVideoStreams.get(card.id);
-
-                        if (remoteVideo) {
-                            return (
-                                <div key={card.id} className="relative" onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}>
-                                    <StreamCard
-                                        stream={remoteVideo}
-                                        username={card.username}
-                                        isSpeaking={isSpeaking}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <div 
-                                key={card.id} 
-                                onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}
-                                className="relative aspect-video rounded-lg overflow-hidden bg-[#1e1f22] border border-black/30 transition-all duration-300 hover:scale-[1.01] cursor-pointer"
-                            >
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className={`w-20 h-20 rounded-full bg-[#3f4147] text-white flex items-center justify-center text-2xl font-bold transition-all duration-300 ${
-                                        isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
-                                    }`}>
-                                        {card.username.slice(0, 1).toUpperCase()}
+                                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
+                                            isSpeaking ? 'bg-green-500 animate-pulse' : card.username === 'Slot libre' ? 'bg-gray-500' : 'bg-green-500'
+                                        }`} />
+                                        <span className="text-xs font-bold text-white">{card.username}</span>
                                     </div>
                                 </div>
-                                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                                        isSpeaking ? 'bg-green-500 animate-pulse' : card.username === 'Slot libre' ? 'bg-gray-500' : 'bg-green-500'
-                                    }`} />
-                                    <span className="text-xs font-bold text-white">{card.username}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    <div className="col-span-full rounded-lg bg-[#232428] border border-black/20 p-4">
-                        <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wide mb-2">Activité vocale</h3>
-                        <p className="text-gray-400 text-sm mb-1">
-                            {isConnected ? `Connecté au salon ${channelId}` : 'Pas encore connecté à un salon vocal'}
-                        </p>
-                        <p className="text-xs text-gray-500">WebRTC audio en pair-à-pair (mesh).</p>
+                            );
+                        })}
                     </div>
                 </div>
             )}

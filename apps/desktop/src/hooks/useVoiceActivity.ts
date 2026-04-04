@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const VAD_THRESHOLD = 18;
+const VAD_THRESHOLD = 30;
 const POLL_INTERVAL_MS = 100;
 
 export const useVoiceActivity = (
@@ -73,32 +73,30 @@ export const useVoiceActivity = (
         if (currentAnalyzers.size > 0) {
             const dataArray = new Uint8Array(128);
             intervalRef.current = setInterval(() => {
-                const next = new Map<string, boolean>();
-                let hasChanged = false;
+                setSpeakingMap(prev => {
+                    const next = new Map<string, boolean>();
+                    let hasChanged = false;
 
-                for (const [id, entry] of currentAnalyzers.entries()) {
-                    let isSpeaking = false;
-                    if (!(isLocalMuted && id === localUserId)) {
-                        try {
-                            entry.analyser.getByteFrequencyData(dataArray);
-                            let sum = 0;
-                            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                            isSpeaking = (sum / dataArray.length) > VAD_THRESHOLD;
-                        } catch (e) {}
+                    for (const [id, entry] of currentAnalyzers.entries()) {
+                        let isSpeaking = false;
+                        if (!(isLocalMuted && id === localUserId)) {
+                            try {
+                                entry.analyser.getByteFrequencyData(dataArray);
+                                let sum = 0;
+                                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                                isSpeaking = (sum / dataArray.length) > VAD_THRESHOLD;
+                            } catch (e) {}
+                        }
+                        next.set(id, isSpeaking);
+                        if (next.get(id) !== prev.get(id)) hasChanged = true;
                     }
-                    next.set(id, isSpeaking);
-                    if (next.get(id) !== speakingMap.get(id)) hasChanged = true;
-                }
 
-                if (next.size !== speakingMap.size) hasChanged = true;
-                if (hasChanged) {
-                    setSpeakingMap(next);
-                }
+                    if (next.size !== prev.size) hasChanged = true;
+                    return hasChanged ? next : prev;
+                });
             }, POLL_INTERVAL_MS);
         } else {
-            if (speakingMap.size > 0) {
-                setSpeakingMap(new Map());
-            }
+            setSpeakingMap(new Map());
         }
 
         return () => {

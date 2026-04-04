@@ -18,4 +18,6 @@ export default interface SidebarContentProps {
     localUserId: string;
     activeView: SidebarView;
     onViewChange: (view: SidebarView) => void;
+    speakingUsers: Map<string, boolean>;
+    channelStartedAt?: number;
 }

@@ -9,7 +9,8 @@ export default interface VoiceState {
     error: string | null;
     localUserId: string;
     localStream: MediaStream | null;
-    joinChannel: (channelId: string, username: string) => Promise<void>;
+    channelStartedAt?: number;
+    joinChannel: (channelId: string, username: string) => void;
     leaveChannel: () => void;
     toggleMute: () => void;
     toggleDeafen: () => void;
@@ -19,4 +20,6 @@ export default interface VoiceState {
     removeScreenTrack: () => void;
     userVolumes: Map<string, number>;
     setUserVolume: (userId: string, volume: number) => void;
+    smartGateEnabled: boolean;
+    setSmartGateEnabled: (enabled: boolean) => void;
 }

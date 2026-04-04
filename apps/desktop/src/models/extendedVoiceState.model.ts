@@ -7,4 +7,7 @@ export default interface ExtendedVoiceState extends VoiceState {
     chatMessages: ChatMessage[];
     sendChatMessage: (message: string) => void;
     setUserInfo: (username: string, userId: string) => void;
+    channelStartedAt?: number;
+    smartGateEnabled: boolean;
+    setSmartGateEnabled: (enabled: boolean) => void;
 }

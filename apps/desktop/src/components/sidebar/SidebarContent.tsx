@@ -4,14 +4,30 @@ import SidebarContentProps from '../../models/sidebarContentProps.model';
 import { useVoiceStore } from '../../context/VoiceContext';
 import { UserContextMenu } from '../ui/UserContextMenu';
 
-const ChannelTimer = ({ isActive }: { isActive: boolean }) => {
+const ChannelTimer = ({ isActive, startedAt }: { isActive: boolean; startedAt?: number }) => {
     const [seconds, setSeconds] = useState(0);
     useEffect(() => {
         let interval: number | undefined;
-        if (isActive) interval = window.setInterval(() => setSeconds((s) => s + 1), 1000);
-        else setSeconds(0);
+        
+        const updateTime = () => {
+            if (startedAt && startedAt > 0) {
+                // Handle case where startedAt might be in seconds vs milliseconds
+                const now = Date.now();
+                const startMs = startedAt < 20000000000 ? startedAt * 1000 : startedAt;
+                setSeconds(Math.max(0, Math.floor((now - startMs) / 1000)));
+            } else {
+                setSeconds((s) => s + 1);
+            }
+        };
+
+        if (isActive) {
+            updateTime();
+            interval = window.setInterval(updateTime, 1000);
+        } else {
+            setSeconds(0);
+        }
         return () => clearInterval(interval);
-    }, [isActive]);
+    }, [isActive, startedAt]);
     if (!isActive) return null;
     const formatTime = (ts: number) => {
         const m = Math.floor((ts % 3600) / 60), s = ts % 60;
@@ -31,7 +47,9 @@ export const SidebarContent = ({
     salons,
     localUserId,
     activeView,
-    onViewChange
+    onViewChange,
+    speakingUsers,
+    channelStartedAt
 }: SidebarContentProps) => {
     const { userVolumes, setUserVolume } = useVoiceStore();
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, userId: string, username: string } | null>(null);
@@ -68,7 +86,7 @@ export const SidebarContent = ({
                         >
                             <Volume2 size={20} className="text-[#80848e]" />
                             <span className="truncate flex-1">{salon.name}</span>
-                            <ChannelTimer isActive={salon.members.length > 0} />
+                            <ChannelTimer isActive={salon.members.length > 0} startedAt={channelId === salon.id ? channelStartedAt : undefined} />
                         </button>
 
                         {(channelId === salon.id) && (
@@ -79,15 +97,18 @@ export const SidebarContent = ({
                                         onContextMenu={(e) => handleContextMenu(e, member.userId, member.username)}
                                         className="flex items-center gap-2 py-1 group rounded-[4px] px-2 hover:bg-[#35373c] cursor-pointer"
                                     >
-                                        <div className={`w-6 h-6 rounded-full bg-[#5865f2] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0
-                                            ${member.userId === localUserId ? 'ring-2 ring-[#248046]' : ''}
+                                        <div className={`w-6 h-6 rounded-full bg-[#5865f2] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 relative
+                                            ${speakingUsers?.get(member.userId) ? 'ring-2 ring-[#23a55a]' : ''}
                                         `}>
                                             {member.username.slice(0, 1).toUpperCase()}
                                         </div>
                                         <span className="text-[14px] text-[#949ba4] group-hover:text-[#dbdee1] truncate flex-1 font-medium">{member.username}</span>
                                         <div className="flex items-center gap-1 flex-shrink-0">
                                             {member.isDeafened ? (
-                                                <span title="Sourdine"><Headphones size={14} className="text-[#f23f42]" /></span>
+                                                <div className="flex items-center gap-1">
+                                                    <span title="Muet"><MicOff size={14} className="text-[#f23f42]" /></span>
+                                                    <span title="Sourdine"><Headphones size={14} className="text-[#f23f42]" /></span>
+                                                </div>
                                             ) : member.isMuted ? (
                                                 <span title="Muet"><MicOff size={14} className="text-[#f23f42]" /></span>
                                             ) : (
