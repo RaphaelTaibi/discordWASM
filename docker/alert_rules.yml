@@ -1,39 +1,52 @@
 groups:
   - name: sfu_alerts
-    interval: 10s
     rules:
-      - alert: SFUServiceDown
+      # Règle 1: Nombre de pairs connectés
+      - alert: HighPeerCount
+        expr: sfu_active_peers > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nombre élevé de pairs connectés"
+          description: "Le nombre de pairs connectés est de {{ $value }} (seuil: 100)"
+
+      # Règle 2: Utilisation de bande passante élevée
+      - alert: HighBandwidthUsage
+        expr: sfu_bandwidth_egress_bps > 50000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Utilisation de bande passante élevée"
+          description: "La bande passante sortante est de {{ $value }} bits/s (seuil: 50 Mbps)"
+
+      # Règle 3: Nombre de paquets par seconde élevé
+      - alert: HighPacketRate
+        expr: sfu_packets_per_second > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taux de paquets élevé"
+          description: "Le taux de paquets est de {{ $value }} packets/s (seuil: 10000)"
+
+      # Règle 4: Nombre de salons actifs élevé
+      - alert: HighChannelCount
+        expr: sfu_active_channels > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nombre élevé de salons actifs"
+          description: "Le nombre de salons actifs est de {{ $value }} (seuil: 50)"
+
+      # Règle 5: Backend down
+      - alert: BackendDown
         expr: up{job="signaling-server"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "SFU WebRTC est hors ligne"
-          description: "Le serveur SFU n'est pas accessible depuis {{ $value | humanizeDuration }}."
-
-      - alert: HighBandwidthUsage
-        expr: sfu_bandwidth_egress_bps > 800000000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Bande passante > 800 Mbps"
-          description: "La bande passante sortante est à {{ ($value / 1000000) | humanize }} Mbps"
-
-      - alert: HighConnectionCount
-        expr: sfu_active_peers > 150
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Trop de connexions ({{ $value }})"
-          description: "Le nombre de pairs connectés dépasse 150"
-
-      - alert: CriticalConnectionCount
-        expr: sfu_active_peers > 200
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Connexions critiques ({{ $value }})"
-          description: "URGENT: Plus de 200 connexions simultanées"
+          summary: "Backend Signaling Server indisponible"
+          description: "Le backend signaling-server est down depuis plus de 1 minute"
