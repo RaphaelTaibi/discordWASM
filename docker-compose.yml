@@ -8,7 +8,7 @@ services:
         BACKUP_PIN_HASH: ${BACKUP_PIN_HASH}
     image: signaling-server
     container_name: signaling-live
-    network_mode: "host" # ⚠️ Crucial pour WebRTC UDP
+    network_mode: "host"
     restart: always
     volumes:
       - /home/ubuntu/secrets/primary.pem:/app/cert.pem:ro
@@ -24,9 +24,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: prometheus
-    network_mode: "host" # Permet d'accéder à localhost:9100 pour node-exporter
-    ports:
-      - "9090:9090"
+    network_mode: "host"
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./docker/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
@@ -37,15 +35,12 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
     restart: unless-stopped
-    depends_on:
-      - signaling-server
 
   grafana:
     image: grafana/grafana:10.2.0
     container_name: grafana
+    network_mode: "host"
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -56,15 +51,11 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
       - GF_PROVISIONING_ENABLED=true
-    depends_on:
-      - prometheus
-    network_mode: "host" # Permet d'accéder à localhost:9090 pour Prometheus
 
   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: alertmanager
-    ports:
-      - "9093:9093"
+    network_mode: "host"
     volumes:
       - ./docker/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
@@ -72,7 +63,6 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
     restart: unless-stopped
-    network_mode: "host" # Permet d'accéder à localhost:9090 pour Prometheus
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -80,7 +70,6 @@ services:
     network_mode: "host"
     restart: unless-stopped
 
-# Déclaration des volumes (Noms identiques aux services)
 volumes:
   grafana_data:
     driver: local
@@ -88,8 +77,3 @@ volumes:
     driver: local
   alertmanager_data:
     driver: local
-
-# Déclaration du réseau
-networks:
-  discordwasm-network:
-    driver: bridge
