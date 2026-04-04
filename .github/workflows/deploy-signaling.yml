@@ -94,8 +94,7 @@ jobs:
             tar -xzvf ~/deploy.tar.gz
             rm ~/deploy.tar.gz
 
-            # 1. Création du fichier .env pour le backend Rust
-            echo "Chargement des secrets environnement..."
+            # 1. Création du fichier .env
             cat > .env << ENVEOF
             PRIMARY_PIN_HASH="${{ secrets.PRIMARY_PIN_HASH }}"
             BACKUP_PIN_HASH="${{ secrets.BACKUP_PIN_HASH }}"
@@ -104,63 +103,62 @@ jobs:
             ENVEOF
             chmod 600 .env
 
-            # 2. Injection des secrets dans Alertmanager (CORRECTION ERREUR CONFIG)
-            # On utilise '|' car les URLs contiennent des '/'
-            echo "Patching Alertmanager config..."
+            # 2. Patch Alertmanager
             sed -i "s|REPLACE_SMTP_USER|${{ secrets.SMTP_EMAIL }}|g" docker/alertmanager.yml
             sed -i "s|REPLACE_SMTP_PASSWORD|${{ secrets.SMTP_AUTH_PASSWORD }}|g" docker/alertmanager.yml
             sed -i "s|REPLACE_SLACK_WEBHOOK|${{ secrets.SLACK_WEBHOOK_URL }}|g" docker/alertmanager.yml
             sed -i "s|REPLACE_DOMAIN|${{ secrets.DOMAIN }}|g" docker/alertmanager.yml
 
             echo "Relance des services Docker..."
-            sudo docker compose --env-file .env down || true
-            sudo docker compose --env-file .env build --no-cache signaling-server
-            sudo docker compose --env-file .env up -d
+            sudo docker compose down || true
+            sudo docker compose build --no-cache signaling-server
+            sudo docker compose up -d
 
-            echo "Attente du démarrage des services (30s)..."
+            echo "Attente du démarrage (30s)..."
             sleep 30
 
-        echo "=== Vérification des services ==="
-      # 1. Signaling (HTTPS)
-      curl -fk --max-time 10 https://localhost:3001/health && echo "✅ Signaling: OK" || (echo "❌ Signaling: FAIL" && exit 1)
+            echo "=== Vérification des services ==="
+            # 1. Signaling
+            curl -fk --max-time 10 https://localhost:3001/health && echo "✅ Signaling: OK" || (echo "❌ Signaling: FAIL" && exit 1)
 
-      # 2. Prometheus
-      curl -s --max-time 10 http://localhost:9090/-/healthy | grep -q "Healthy" && echo "✅ Prometheus: OK" || (echo "❌ Prometheus: FAIL" && exit 1)
+            # 2. Prometheus
+            curl -s --max-time 10 http://localhost:9090/-/healthy | grep -q "Healthy" && echo "✅ Prometheus: OK" || (echo "❌ Prometheus: FAIL" && exit 1)
 
-      # 3. Grafana
-      curl -s --max-time 10 http://localhost:3000/api/health | grep -q "ok" && echo "✅ Grafana: OK" || (echo "❌ Grafana: FAIL" && exit 1)
-      
-      # 4. Alertmanager (AVEC RETRY)
-        echo "Vérification Alertmanager..."
-        success=false
-        for i in {1..6}; do
-        if curl -s --max-time 5 http://localhost:9093/-/healthy | grep -q "OK\|Healthy"; then
-      echo "✅ Alertmanager: OK"
-        success=true
-        break
-        fi
-      echo "Tentative $i/6 : Alertmanager ne répond pas encore, attente..."
-        sleep 10
-        done
-        
-        if [ "$success" = false ]; then
-      echo "❌ Alertmanager: FAILED après 1 minute"
-        sudo docker compose logs alertmanager
-        exit 1
-        fi
-        
-        echo "🚀 Déploiement terminé avec succès !"
+            # 3. Grafana
+            curl -s --max-time 10 http://localhost:3000/api/health | grep -q "ok" && echo "✅ Grafana: OK" || (echo "❌ Grafana: FAIL" && exit 1)
 
-    notify:
-      needs: build-and-deploy
-      if: always()
-      runs-on: ubuntu-latest
-      steps:
-        - name: Send Slack Notification
-          uses: 8398a7/action-slack@v3
-          with:
-            status: ${{ job.status }}
-            text: |
+            # 4. Alertmanager (Retry Loop)
+            echo "Vérification Alertmanager..."
+            success=false
+            for i in {1..6}; do
+              if curl -s --max-time 5 http://localhost:9093/-/healthy | grep -q "OK\|Healthy"; then
+                echo "✅ Alertmanager: OK"
+                success=true
+                break
+              fi
+              echo "Tentative $i/6 : Attente Alertmanager..."
+              sleep 10
+            done
+
+            if [ "$success" = false ]; then
+              echo "❌ Alertmanager: FAILED"
+              sudo docker compose logs alertmanager
+              exit 1
+            fi
+            
+            sudo docker image prune -f
+            echo "🚀 Déploiement terminé avec succès !"
+
+  notify:
+    needs: build-and-deploy
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
             :robot: Déploiement SFU + Monitoring
             :rocket: *Statut:* ${{ job.status }}
             :book: *Commit:* ${{ github.event.head_commit.message }}
