@@ -30,7 +30,6 @@ use webrtc::rtp::packet::Packet;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::TrackLocalWriter;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
-
 use prometheus::{
     Encoder,
     Histogram,
@@ -39,9 +38,7 @@ use prometheus::{
     register_histogram,
     register_int_gauge,
 };
-
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 
 ///Global Metrics
 static ACTIVE_PEERS: Lazy<IntGauge> = Lazy::new(|| {
@@ -307,30 +304,6 @@ struct PeerInfo {
     is_deafened: bool,
 }
 
-fn init_prometheus_metrics() {
-    let _ = ACTIVE_PEERS
-        .set(register_int_gauge!("sfu_active_peers", "Nombre de pairs connectés").unwrap());
-
-    let _ = ACTIVE_CHANNELS
-        .set(register_int_gauge!("sfu_active_channels", "Nombre de salons actifs").unwrap());
-
-    let _ = BANDWIDTH_EGRESS.set(
-        register_int_gauge!(
-            "sfu_bandwidth_egress_bps",
-            "Bande passante sortante (bits/s)"
-        )
-        .unwrap(),
-    );
-
-    let _ = PACKETS_PER_SEC.set(
-        register_histogram!(
-            "sfu_packets_per_second",
-            "Paquets RTP par seconde",
-            vec![100.0, 500.0, 1000.0, 5000.0, 10000.0]
-        )
-        .unwrap(),
-    );
-}
 
 fn serialize_message(message: &ServerMessage) -> Option<String> {
     serde_json::to_string(message).ok()
@@ -434,42 +407,34 @@ async fn remove_peer(state: &Arc<AppState>, user_id: &str) {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-
     let mut m = MediaEngine::default();
     m.register_default_codecs()
         .expect("Failed to register codecs");
-
     let mut setting_engine = SettingEngine::default();
     let ephemeral_udp = EphemeralUDP::new(10000, 20000).expect("Failed to set port range");
     setting_engine.set_udp_network(UDPNetwork::Ephemeral(ephemeral_udp));
-
     let mut registry = InterceptorRegistry::default();
     registry =
         register_default_interceptors(registry, &mut m).expect("Failed to register interceptors");
-
     let api = APIBuilder::new()
         .with_media_engine(m)
         .with_interceptor_registry(registry)
         .with_setting_engine(setting_engine)
         .build();
-
     let app_state = Arc::new(AppState {
         peers: Mutex::new(HashMap::new()),
         channels: Mutex::new(HashMap::new()),
         api,
     });
-
     let stats_state = Arc::clone(&app_state);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(2));
         loop {
             interval.tick().await;
-
             let all_stats = {
                 let channels = stats_state.channels.lock().await;
                 let mut total_packets = 0u64;
                 let mut stats_list = Vec::new();
-
                 for (channel_id, channel) in channels.iter() {
                     for (user_id, stats) in channel.stats.iter() {
                         let peers = stats_state.peers.lock().await;
@@ -487,13 +452,10 @@ async fn main() {
                     }
                 }
 
-                // ✅ Update metric (safe)
                 PACKETS_PER_SEC.observe(total_packets as f64);
-
                 stats_list
             };
-
-            for (channel_id, user_id, msg) in all_stats {
+            for (_channel_id, user_id, msg) in all_stats {
                 let peers = stats_state.peers.lock().await;
                 if let Some(peer) = peers.get(&user_id) {
                     let _ = peer.tx.send(serialize_message(&msg).unwrap());
@@ -501,23 +463,21 @@ async fn main() {
             }
         }
     });
-
-    let app = Router::new()
+    let app: Router<()> = Router::new()
         .route("/ws", get(ws_handler))
         .route("/health", get(|| async { "Healthy" }))
         .route("/metrics", get(prometheus_handler))
         .layer(CorsLayer::permissive())
         .with_state(app_state);
-
     let config = RustlsConfig::from_pem_file(PathBuf::from("cert.pem"), PathBuf::from("key.pem"))
         .await
         .expect("Failed to find cert.pem or key.pem");
-
     let addr: SocketAddr = "0.0.0.0:3001".parse().unwrap();
     println!(
         "SFU Server running on https://{} | UDP Range: 10000-20000",
         addr
     );
+
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service())
         .await
@@ -529,7 +489,6 @@ async fn prometheus_handler(state: axum::extract::State<Arc<AppState>>) -> Strin
     let peers = state.peers.lock().await;
     let channels = state.channels.lock().await;
 
-    // ✅ Safe: Pas de unsafe, les Lazy sont thread-safe
     ACTIVE_PEERS.set(peers.len() as i64);
     ACTIVE_CHANNELS.set(channels.len() as i64);
 
