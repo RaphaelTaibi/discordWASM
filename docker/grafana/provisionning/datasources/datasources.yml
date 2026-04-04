@@ -4,7 +4,7 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://172.17.0.1:9090/-/healthy
+    url: http://89.168.59.45:9090/-/healthy
     isDefault: true
     editable: true
     jsonData:
