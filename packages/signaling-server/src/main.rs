@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, mpsc};
 use tower_http::cors::CorsLayer;
+use dashmap::DashMap;
 use webrtc::api::API;
 use webrtc::api::APIBuilder;
 use webrtc::api::interceptor_registry::register_default_interceptors;
@@ -41,6 +42,48 @@ use prometheus::{
 use once_cell::sync::Lazy;
 use rustls::crypto::aws_lc_rs;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ServerChannel {
+    pub id: String,
+    pub name: String,
+    pub r#type: String, // 'text' | 'voice' | 'video'
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Server {
+    pub id: String,
+    pub name: String,
+    pub owner_public_key: String,
+    pub invite_key: String,
+    pub icon: Option<String>,
+    pub channels: Vec<ServerChannel>,
+}
+
+#[derive(Clone)]
+pub struct ServerRegistry {
+    pub servers: Arc<DashMap<String, Server>>,
+}
+
+impl ServerRegistry {
+    pub fn new() -> Self {
+        let servers = Arc::new(DashMap::new());
+        if let Ok(contents) = std::fs::read_to_string("servers.json") {
+            if let Ok(loaded_servers) = serde_json::from_str::<Vec<Server>>(&contents) {
+                for s in loaded_servers {
+                    servers.insert(s.id.clone(), s);
+                }
+            }
+        }
+        Self { servers }
+    }
+
+    pub fn save(&self) {
+        let servers_vec: Vec<Server> = self.servers.iter().map(|kv| kv.value().clone()).collect();
+        if let Ok(json) = serde_json::to_string_pretty(&servers_vec) {
+            let _ = std::fs::write("servers.json", json);
+        }
+    }
+}
 
 ///Global Metrics
 static ACTIVE_PEERS: Lazy<IntGauge> = Lazy::new(|| {
@@ -190,6 +233,7 @@ pub struct ChannelState {
 struct AppState {
     peers: Mutex<HashMap<String, PeerSession>>,
     channels: Mutex<HashMap<String, ChannelState>>,
+    server_registry: ServerRegistry,
     api: API,
 }
 
@@ -414,14 +458,21 @@ async fn remove_peer(state: &Arc<AppState>, user_id: &str) {
 
 #[tokio::main]
 async fn main() {
+    // Check if running in dev mode (no TLS)
+    let is_dev = std::env::var("DEV_MODE").is_ok();
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(if is_dev { 8080 } else { 3001 });
 
-    if let Err(e) = aws_lc_rs::default_provider().install_default() {
-        eprintln!("Failed to install aws-lc-rs crypto provider: {:?}", e);
-        std::process::exit(1);
+    if !is_dev {
+        if let Err(e) = aws_lc_rs::default_provider().install_default() {
+            eprintln!("Failed to install aws-lc-rs crypto provider: {:?}", e);
+            std::process::exit(1);
+        }
     }
 
     tracing_subscriber::fmt::init();
-
 
     let mut m = MediaEngine::default();
     m.register_default_codecs()
@@ -440,6 +491,7 @@ async fn main() {
     let app_state = Arc::new(AppState {
         peers: Mutex::new(HashMap::new()),
         channels: Mutex::new(HashMap::new()),
+        server_registry: ServerRegistry::new(),
         api,
     });
     let stats_state = Arc::clone(&app_state);
@@ -479,25 +531,42 @@ async fn main() {
             }
         }
     });
+
     let app: Router<()> = Router::new()
         .route("/ws", get(ws_handler))
         .route("/health", get(|| async { "Healthy" }))
         .route("/metrics", get(prometheus_handler))
         .layer(CorsLayer::permissive())
         .with_state(app_state);
-    let config = RustlsConfig::from_pem_file(PathBuf::from("cert.pem"), PathBuf::from("key.pem"))
+
+    let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+
+    if is_dev {
+        // DEV: HTTP simple sans TLS
+        println!(
+            "🔧 DEV MODE: SFU Server running on http://{} | UDP Range: 10000-20000",
+            addr
+        );
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    } else {
+        // PROD: HTTPS avec TLS
+        let tls_config = RustlsConfig::from_pem_file(
+            PathBuf::from("cert.pem"),
+            PathBuf::from("key.pem")
+        )
         .await
         .expect("Failed to find cert.pem or key.pem");
-    let addr: SocketAddr = "0.0.0.0:3001".parse().unwrap();
-    println!(
-        "SFU Server running on https://{} | UDP Range: 10000-20000",
-        addr
-    );
 
-    axum_server::bind_rustls(addr, config)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+        println!(
+            "🚀 PROD MODE: SFU Server running on https://{} | UDP Range: 10000-20000",
+            addr
+        );
+        axum_server::bind_rustls(addr, tls_config)
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    }
 }
 
 /// Handler Prometheus

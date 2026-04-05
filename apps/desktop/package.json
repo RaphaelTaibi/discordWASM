@@ -9,7 +9,9 @@
     "build": "tsc && vite build",
     "build:worklet": "tsc src/worker/noise-gate.worklet.ts --outDir public/worker --module ESNext --target ES2020 --esModuleInterop --skipLibCheck",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "server:dev": "cd ../.. && $env:DEV_MODE=1; cargo run --package signaling-server",
+    "server:prod": "cd ../.. && cargo run --package signaling-server --release"
   },
   "dependencies": {
     "@jitsi/rnnoise-wasm": "^0.2.1",

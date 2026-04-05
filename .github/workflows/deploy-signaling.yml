@@ -95,12 +95,12 @@ jobs:
           key: ${{ secrets.ORACLE_SSH_KEY }}
           script: |
             echo "=== Déploiement SFU + Monitoring ==="
-            mkdir -p ~/discordWASM
-            cd ~/discordWASM
+            mkdir -p ~/VocalWASM
+            cd ~/VocalWASM
             
             # 🔥 1. RÉPARATION DES PERMISSIONS (Résout le Permission Denied)
             # Docker crée des dossiers en root, on doit les reprendre pour l'utilisateur ubuntu
-            sudo chown -R ubuntu:ubuntu ~/discordWASM
+            sudo chown -R ubuntu:ubuntu ~/VocalWASM
             
             # 2. Nettoyage et extraction propre
             rm -rf docker/
@@ -126,7 +126,7 @@ jobs:
             sudo docker compose down || true
             
             # 🔥 CRUCIAL : Supprimer le volume Grafana pour forcer la prise en compte du nouveau provisioning
-            sudo docker volume rm discordwasm_grafana_data || true
+            sudo docker volume rm Vocalwasm_grafana_data || true
             
             sudo docker compose build --no-cache signaling-server
             sudo docker compose up -d

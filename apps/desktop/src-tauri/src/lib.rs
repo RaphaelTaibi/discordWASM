@@ -95,14 +95,24 @@ impl ServerCertVerifier for MyVerifier {
 }
 
 /// Invokes the signaling server via an HTTPS GET request.
-/// Utilizes the provided pre-configured `reqwest::Client` injected as a Tauri state,
-/// ensuring that the request honors the custom SSL pinning rules.
+/// In dev mode (DEV_MODE env or http:// URL), bypasses SSL pinning.
 ///
 /// # Returns
 /// An `Ok(String)` containing the server's response body text upon success,
 /// or an `Err(String)` containing the TLS/Network error message on failure.
 #[tauri::command]
 async fn call_signaling(client: tauri::State<'_, reqwest::Client>, url: String) -> Result<String, String> {
+    // DEV MODE: Si l'URL est HTTP (pas HTTPS), on bypass le pinning
+    if url.starts_with("http://") {
+        let dev_client = reqwest::Client::new();
+        let res = dev_client.get(&url).send().await;
+        return match res {
+            Ok(resp) => Ok(resp.text().await.map_err(|e| e.to_string())?),
+            Err(e) => Err(format!("Erreur HTTP (dev): {}", e)),
+        };
+    }
+
+    // PROD MODE: Utilise le client avec pinning TLS
     let res = client.get(&url).send().await;
     match res {
         Ok(resp) => Ok(resp.text().await.map_err(|e| e.to_string())?),

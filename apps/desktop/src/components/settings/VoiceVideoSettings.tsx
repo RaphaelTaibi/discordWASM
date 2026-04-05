@@ -1,33 +1,40 @@
-import { Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useVoiceStore } from "../../context/VoiceContext";
 
 export const VoiceVideoSettings = () => {
     const { 
+        smartGateEnabled, setSmartGateEnabled,
+        selectedMic, setSelectedMic,
+        selectedSpeaker, setSelectedSpeaker,
         vadAuto, setVadAuto,
-        vadMode, setVadMode,
         vadThreshold, setVadThreshold,
-        pttKey, setPttKey,
-        rawMicVolumeRef
-    } = useVoiceStore();
+        rawMicVolumeRef,
+        webrtcNoiseSuppressionEnabled, setWebrtcNoiseSuppressionEnabled
+    } = useVoiceStore() as any;
 
+    const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+    const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
     const [micVolume, setMicVolume] = useState(0);
     const animationRef = useRef<number | null>(null);
-    const [listeningToKey, setListeningToKey] = useState(false);
+
+    useEffect(() => {
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+            setMicrophones(devices.filter(d => d.kind === 'audioinput'));
+            setSpeakers(devices.filter(d => d.kind === 'audiooutput'));
+        });
+    }, []);
 
     useEffect(() => {
         let shouldContinue = true;
         const updateAudioLevel = () => {
-            const rms = rawMicVolumeRef.current;
+            const rms = rawMicVolumeRef?.current ?? 0;
             const db = rms > 0 ? 20 * Math.log10(rms) : -100;
             const volPercent = db + 100;
             setMicVolume(Math.max(0, Math.min(100, volPercent)));
-
             if (shouldContinue) {
                 animationRef.current = requestAnimationFrame(updateAudioLevel);
             }
         };
-
         animationRef.current = requestAnimationFrame(updateAudioLevel);
         return () => {
             shouldContinue = false;
@@ -35,109 +42,166 @@ export const VoiceVideoSettings = () => {
         };
     }, [rawMicVolumeRef]);
 
-    useEffect(() => {
-        if (!listeningToKey) return;
-        const handleKey = (e: KeyboardEvent) => {
-            e.preventDefault();
-            setPttKey(e.code);
-            setListeningToKey(false);
-        };
-        window.addEventListener('keydown', handleKey);
-        return () => window.removeEventListener('keydown', handleKey);
-    }, [listeningToKey, setPttKey]);
-
     return (
-        <div className="flex flex-col gap-6">
-            <h2 className="text-[#f2f3f5] text-[20px] font-bold">Voix & Vidéo</h2>
+        <div className="flex flex-col gap-8 animate-in fade-in duration-500">
+            <h2 className="text-cyan-50 text-[24px] font-black uppercase tracking-wider drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
+                Paramètres Audio
+            </h2>
 
-
-            <div className="flex flex-col gap-4">
-                <h3 className="text-[#f2f3f5] text-[16px] font-bold">Mode d'Entrée</h3>
+            {/* Section Périphériques */}
+            <div className="bg-[#050511] border border-cyan-500/20 p-6 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.05)] relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/10 to-transparent pointer-events-none rounded-xl" />
                 
-                <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-3 bg-[#2b2d31] p-3 rounded-lg cursor-pointer border border-transparent hover:border-black/20">
-                        <input type="radio" name="vadMode" checked={vadMode === 'VAD'} onChange={() => setVadMode('VAD')} className="scale-125 accent-[#5865f2]" />
-                        <div className="flex flex-col">
-                            <span className="text-[#dbdee1] font-medium">Détection de la voix</span>
-                            <span className="text-[#b5bac1] text-[13px]">Activer automatiquement le microphone lorsque vous parlez.</span>
-                        </div>
-                    </label>
-                    
-                    <label className="flex items-center gap-3 bg-[#2b2d31] p-3 rounded-lg cursor-pointer border border-transparent hover:border-black/20">
-                        <input type="radio" name="vadMode" checked={vadMode === 'PTT'} onChange={() => setVadMode('PTT')} className="scale-125 accent-[#5865f2]" />
-                        <div className="flex flex-col">
-                            <span className="text-[#dbdee1] font-medium">Appuyer pour parler</span>
-                            <span className="text-[#b5bac1] text-[13px]">Ne transmet l'audio que si le raccourci est pressé.</span>
-                        </div>
-                    </label>
+                <h3 className="text-cyan-500/70 text-[11px] font-black uppercase tracking-widest mb-5">Périphériques Audio</h3>
+                
+                <div className="flex flex-col gap-5 relative z-10">
+                    {/* Périphérique d'entrée */}
+                    <div className="flex flex-col gap-2">
+                        <label className="text-cyan-100/60 font-bold text-[13px]">Périphérique d'entrée</label>
+                        <select 
+                            value={selectedMic || ''}
+                            onChange={(e) => setSelectedMic(e.target.value)}
+                            className="w-full bg-[#0a0b14] text-cyan-50 px-4 py-3 rounded-lg border border-cyan-500/30 focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(34,211,238,0.2)] focus:outline-none transition-all font-medium"
+                        >
+                            <option value="">Défaut</option>
+                            {microphones.map(mic => (
+                                <option key={mic.deviceId} value={mic.deviceId}>
+                                    {mic.label || `Microphone ${mic.deviceId.slice(0,5)}`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Périphérique de sortie */}
+                    <div className="flex flex-col gap-2">
+                        <label className="text-cyan-100/60 font-bold text-[13px]">Périphérique de sortie</label>
+                        <select 
+                            value={selectedSpeaker || ''}
+                            onChange={(e) => setSelectedSpeaker(e.target.value)}
+                            className="w-full bg-[#0a0b14] text-cyan-50 px-4 py-3 rounded-lg border border-cyan-500/30 focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(34,211,238,0.2)] focus:outline-none transition-all font-medium"
+                        >
+                            <option value="">Défaut</option>
+                            {speakers.map(spk => (
+                                <option key={spk.deviceId} value={spk.deviceId}>
+                                    {spk.label || `Haut-parleur ${spk.deviceId.slice(0,5)}`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* Section Sensibilité Micro */}
+            <div className="bg-[#050511] border border-cyan-500/20 p-6 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.05)] relative group">
+                <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/10 to-transparent pointer-events-none rounded-xl" />
+                
+                <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-cyan-500/70 text-[11px] font-black uppercase tracking-widest">Sensibilité du Microphone</h3>
+                    <div className="flex items-center gap-3">
+                        <span className="text-cyan-100/40 text-[12px] font-bold uppercase tracking-wider">Auto</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={vadAuto ?? true} 
+                                onChange={(e) => setVadAuto?.(e.target.checked)} 
+                            />
+                            <div className="w-11 h-6 bg-[#0a0b14] border border-cyan-500/30 rounded-full peer peer-checked:bg-cyan-500 peer-checked:border-cyan-400 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"></div>
+                        </label>
+                    </div>
                 </div>
 
-                {vadMode === 'PTT' && (
-                    <div className="mt-2 flex flex-col">
-                        <h3 className="text-[#b5bac1] text-[12px] font-bold uppercase mb-2">Raccourci Clavier (Maintiens appuyé)</h3>
-                        <button 
-                            className={`bg-[#1e1f22] border ${listeningToKey ? 'border-[#5865f2] shadow-[0_0_0_2px_rgba(88,101,242,0.2)]' : 'border-black/30 hover:border-[#80848e]'} rounded py-3 px-4 text-[#dbdee1] font-medium w-64 text-left transition-all focus:outline-none flex justify-between items-center`}
-                            onClick={() => setListeningToKey(true)}
-                        >
-                            <span>{listeningToKey ? 'En écoute...' : pttKey.replace('Key', '')}</span>
-                            {listeningToKey && <span className="animate-pulse w-2 h-2 rounded-full bg-red-500"></span>}
-                        </button>
-                    </div>
-                )}
-
-                {vadMode === 'VAD' && (
-                    <div className="mt-4 flex flex-col gap-4">
-                        <h3 className="text-[#f2f3f5] text-[16px] font-bold">Détection de la voix</h3>
-                        
-                        <div className="bg-[#2b2d31] rounded-lg p-5">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-[#dbdee1] text-[14px] font-medium">Sensibilité Automatique</span>
-                                <label className="relative inline-block w-10 h-5 cursor-pointer">
-                                    <input type="checkbox" className="peer w-0 h-0 opacity-0" checked={vadAuto} onChange={(e) => setVadAuto(e.target.checked)} />
-                                    <span className={`absolute top-0 left-0 right-0 bottom-0 ${vadAuto ? 'bg-[#23a55a]' : 'bg-[#80848e]'} transition-all duration-300 rounded-full before:absolute before:content-[''] before:h-3.5 before:w-3.5 before:left-1 before:bottom-0.75 before:bg-white before:transition-all before:duration-300 before:rounded-full ${vadAuto ? 'before:translate-x-4' : ''}`}></span>
-                                </label>
-                            </div>
-
-                            <div className={`flex flex-col gap-4 mt-8 transition-opacity ${vadAuto ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                                <div className="relative w-full h-6 flex items-center group">
-                                    <div 
-                                        className="absolute -top-7 -translate-x-1/2 bg-[#1e1f22] text-white text-[12px] font-bold py-[3px] px-[8px] rounded shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap"
-                                        style={{ left: `${vadThreshold * 100}%` }}
-                                    >
-                                        {Math.round(-100 + (vadThreshold * 100))}dB
-                                    </div>
-
-                                    <div className="absolute left-0 w-full h-4 rounded overflow-hidden bg-[#1e1f22]">
-                                        <div 
-                                            className="absolute inset-0" 
-                                            style={{ background: `linear-gradient(to right, rgba(240,178,50,0.3) ${vadThreshold * 100}%, rgba(35,165,90,0.3) ${vadThreshold * 100}%)` }} 
-                                        />
-                                        <div 
-                                            className="absolute inset-0 transition-all duration-75"
-                                            style={{ 
-                                                background: `linear-gradient(to right, #f0b232 ${vadThreshold * 100}%, #23a55a ${vadThreshold * 100}%)`,
-                                                clipPath: `inset(0 ${100 - micVolume}% 0 0)`
-                                            }}
-                                        />
-                                    </div>
-                                    
-                                    <input 
-                                        type="range" 
-                                        className="absolute left-0 w-full h-full cursor-pointer bg-transparent appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-gray-300 [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:shadow-md z-20"
-                                        min="0" max="1" step="0.01"
-                                        value={vadThreshold}
-                                        onChange={(e) => setVadThreshold(parseFloat(e.target.value))}
-                                        disabled={vadAuto}
-                                    />
-                                </div>
-                                <div className="flex justify-between text-[11px] text-[#949ba4] font-bold uppercase px-1">
-                                    <span>Ajuster le seuil manuellement</span>
-                                    <span className="flex items-center gap-1"><Volume2 size={12} /> Test micro en direct</span>
-                                </div>
-                            </div>
+                <div className={`flex flex-col gap-3 relative z-10 transition-all duration-300 ${vadAuto ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                    {/* Barre de captation voix + slider */}
+                    <div className="relative w-full h-6 flex items-center">
+                        <div className="absolute left-0 w-full h-3 rounded-full overflow-hidden bg-[#0a0b14] border border-cyan-500/20 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
+                            {/* Zone avant/après seuil */}
+                            <div 
+                                className="absolute inset-0" 
+                                style={{ background: `linear-gradient(to right, rgba(139,92,246,0.2) ${(vadThreshold ?? 0.3) * 100}%, rgba(34,211,238,0.2) ${(vadThreshold ?? 0.3) * 100}%)` }} 
+                            />
+                            {/* Barre de volume en temps réel */}
+                            <div 
+                                className="absolute inset-0 transition-all duration-75"
+                                style={{ 
+                                    background: `linear-gradient(to right, #8b5cf6 ${(vadThreshold ?? 0.3) * 100}%, #22d3ee ${(vadThreshold ?? 0.3) * 100}%)`,
+                                    clipPath: `inset(0 ${100 - micVolume}% 0 0)`
+                                }}
+                            />
                         </div>
+                        <input 
+                            type="range" 
+                            className="w-full absolute opacity-0 z-20 cursor-pointer h-full"
+                            min="0" max="1" step="0.01"
+                            value={vadThreshold ?? 0.3}
+                            onChange={(e) => setVadThreshold?.(parseFloat(e.target.value))}
+                            disabled={vadAuto}
+                        />
+                        {/* Curseur du seuil */}
+                        <div 
+                            className="absolute h-5 w-1.5 bg-white rounded-sm shadow-[0_0_8px_rgba(255,255,255,0.9)] z-10 pointer-events-none"
+                            style={{ left: `calc(${(vadThreshold ?? 0.3) * 100}% - 3px)` }}
+                        />
                     </div>
-                )}
+                    <div className="flex justify-between text-[10px] text-cyan-500/40 font-black uppercase tracking-widest">
+                        <span>Sensible</span>
+                        <span>Fort</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Section Traitement Artificiel WASM */}
+            <div className="bg-[#050511] border border-cyan-500/20 p-6 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.05)] relative group">
+                <div className="absolute inset-0 bg-gradient-to-bl from-cyan-900/10 to-transparent pointer-events-none rounded-xl" />
+                
+                <div className="flex items-center gap-3 mb-5">
+                    <h3 className="text-cyan-500/70 text-[11px] font-black uppercase tracking-widest">Traitement Artificiel</h3>
+                    <span className="bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-[0_0_10px_rgba(34,211,238,0.3)]">
+                        WASM
+                    </span>
+                </div>
+
+                <div className="flex flex-col gap-3 relative z-10">
+                    {/* Noise Gate WASM */}
+                    <div className="bg-[#0a0b14] rounded-lg p-4 flex items-center justify-between border border-cyan-500/10 hover:border-cyan-500/30 transition-all group/card">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-purple-500/30 group-hover/card:bg-purple-400 transition-colors rounded-l-lg" />
+                        <div className="flex flex-col gap-1 pl-2">
+                            <span className="text-cyan-50 font-bold text-[14px]">Noise Gate WASM (Rust)</span>
+                            <span className="text-cyan-500/50 text-[12px] font-medium">
+                                Réduit automatiquement les bruits de fond constants.
+                            </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={smartGateEnabled ?? false} 
+                                onChange={(e) => setSmartGateEnabled?.(e.target.checked)} 
+                            />
+                            <div className="w-11 h-6 bg-[#1a1c24] border border-cyan-500/20 rounded-full peer peer-checked:bg-cyan-500 peer-checked:border-cyan-400 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"></div>
+                        </label>
+                    </div>
+
+                    {/* Réduction de bruit WebRTC */}
+                    <div className="bg-[#0a0b14] rounded-lg p-4 flex items-center justify-between border border-cyan-500/10 hover:border-cyan-500/30 transition-all group/card">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/30 group-hover/card:bg-cyan-400 transition-colors rounded-l-lg" />
+                        <div className="flex flex-col gap-1 pl-2">
+                            <span className="text-cyan-50 font-bold text-[14px]">Réduction de bruit WebRTC</span>
+                            <span className="text-cyan-500/50 text-[12px] font-medium">
+                                Utilise l'algorithme intégré de réduction de bruit du navigateur.
+                            </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={webrtcNoiseSuppressionEnabled ?? true} 
+                                onChange={(e) => setWebrtcNoiseSuppressionEnabled?.(e.target.checked)} 
+                            />
+                            <div className="w-11 h-6 bg-[#1a1c24] border border-cyan-500/20 rounded-full peer peer-checked:bg-cyan-500 peer-checked:border-cyan-400 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"></div>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
     );

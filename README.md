@@ -49,6 +49,11 @@ Releases and install instructions will be available on the [Releases page](https
 
 See the [Changelog](./CHANGELOG.md) for version history.
 
+## Disclaimer
+**This project is an independent, open-source educational proof-of-concept. It is not affiliated with,
+endorsed by, or associated with Discord Inc. The UI design is intended as a study of modern
+communication interface patterns.**
+
 ## License
 MIT
 
@@ -106,6 +111,10 @@ Les releases et instructions d’installation seront disponibles sur la [page Re
 ## Changelog
 
 Voir le [Changelog](./CHANGELOG.md) pour l’historique des versions.
+
+
+## Disclaimer
+**Ce logiciel est une preuve de concept technique. L'interface utilisateur est inspirée par les standards modernes de communication. Vocal WASM n'est pas affilié à Discord Inc.**
 
 ## Licence
 MIT

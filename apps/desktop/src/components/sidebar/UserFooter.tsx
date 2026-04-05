@@ -4,10 +4,10 @@ import UserFooterProps from '../../models/userFooterProps.model';
 
 const NetworkIcon = ({ quality }: { quality: 0 | 1 | 2 | 3 }) => {
     const getColor = () => {
-        if (quality === 3) return '#23a55a';
+        if (quality === 3) return '#22d3ee'; // cyan-400
         if (quality === 2) return '#f0b232';
         if (quality === 1) return '#f23f42';
-        return '#80848e';
+        return '#3f3f46'; // zinc-700
     };
 
     return (
@@ -90,68 +90,71 @@ const UserFooter = ({
     };
 
     return (
-        <div className="w-full select-none bg-[#232428] flex flex-col flex-shrink-0 border-t border-black/10">
+        <div className="w-full select-none bg-[#0a0b14]/90 backdrop-blur-3xl flex flex-col flex-shrink-0 border-t border-cyan-500/20 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-20">
             {channelId && (
-                <div className="h-[48px] px-2 flex items-center border-b border-white/[0.04] relative">
+                <div className="h-[48px] px-3 flex items-center border-b border-cyan-500/10 relative">
                     {showVoiceDetails && isConnected && (
                         <div
                             ref={voiceDetailsRef}
-                            className="absolute bottom-full left-0 mb-3 ml-2 w-[340px] bg-[#313338] rounded-[8px] shadow-2xl border border-[#1e1f22] z-50 animate-in fade-in zoom-in duration-200"
+                            className="absolute bottom-full left-0 mb-3 ml-2 w-[340px] bg-[#050511] rounded-xl shadow-[0_10px_40px_rgba(34,211,238,0.2)] border border-cyan-500/30 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-300"
                         >
-                            <div className="p-4 pt-5">
-                                <h3 className="text-white text-[20px] font-bold mb-4" style={fontStyle}>Détails de la voix</h3>
-                                <div className="flex border-b border-[#3f4147] mb-4">
+                            <div className="p-4 pt-5 pb-3">
+                                <h3 className="text-cyan-50 font-bold uppercase tracking-widest text-[16px] mb-4">Voice System Matrix</h3>
+                                <div className="flex border-b border-cyan-500/20 mb-4 pb-2">
                                     <button
                                         onClick={() => setVoiceDetailsTab('connexion')}
-                                        className={`pb-2 px-1 mr-4 text-[14px] font-medium transition-colors ${voiceDetailsTab === 'connexion' ? 'text-[#5865f2] border-b-2 border-[#5865f2]' : 'text-[#b5bac1] hover:text-[#dbdee1]'}`}
+                                        className={`pb-2 px-1 mr-4 text-[14px] font-medium transition-colors relative ${voiceDetailsTab === 'connexion' ? 'text-cyan-400' : 'text-gray-500 hover:text-cyan-100'}`}
                                     >
                                         Connexion
+                                        {voiceDetailsTab === 'connexion' && (
+                                            <div className="absolute bottom-[-9px] left-0 right-0 h-[2px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>
+                                        )}
                                     </button>
                                     <button
                                         onClick={() => setVoiceDetailsTab('confidentialité')}
-                                        className={`pb-2 px-1 text-[14px] font-medium transition-colors ${voiceDetailsTab === 'confidentialité' ? 'text-[#5865f2] border-b-2 border-[#5865f2]' : 'text-[#b5bac1] hover:text-[#dbdee1]'}`}
+                                        className={`pb-2 px-1 text-[14px] font-medium transition-colors relative ${voiceDetailsTab === 'confidentialité' ? 'text-cyan-400' : 'text-gray-500 hover:text-cyan-100'}`}
                                     >
                                         Confidentialité
+                                        {voiceDetailsTab === 'confidentialité' && (
+                                            <div className="absolute bottom-[-9px] left-0 right-0 h-[2px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>
+                                        )}
                                     </button>
                                 </div>
                                 {voiceDetailsTab === 'connexion' ? (
-                                    <div className="text-[14px] text-[#dbdee1]" style={fontStyle}>
+                                    <div className="text-[14px] text-cyan-100/70" style={fontStyle}>
                                         <div className="mb-1">
-                                            <span className="font-semibold">Latence moyenne : </span>
-                                            <span className="font-bold text-white">{averagePing} ms</span>
+                                            <span className="font-semibold text-cyan-500/80 uppercase text-[10px] tracking-wider">Latence moyenne : </span>
+                                            <span className="font-bold text-cyan-300">{averagePing} ms</span>
                                         </div>
                                         <div className="mb-1">
-                                            <span className="font-semibold">Dernière latence enregistrée : </span>
-                                            <span className="font-bold text-white">{ping} ms</span>
+                                            <span className="font-semibold text-cyan-500/80 uppercase text-[10px] tracking-wider">Dernière latence : </span>
+                                            <span className="font-bold text-cyan-300">{ping} ms</span>
                                         </div>
                                         <div className="mb-4">
-                                            <span className="font-semibold">Taux de perte de paquets sortants : </span>
-                                            <span className="font-bold text-white">{packetLoss.toFixed(1)} %</span>
+                                            <span className="font-semibold text-cyan-500/80 uppercase text-[10px] tracking-wider">Perte de paquets : </span>
+                                            <span className="font-bold text-cyan-300">{packetLoss.toFixed(1)} %</span>
                                         </div>
-                                        <p className="text-[#b5bac1] leading-relaxed">
-                                            Tu constateras peut-être un décalage de l'audio à partir de 250 ms. Il se peut qu'on t'entende avec une voix robotique si ton taux de perte de paquets est supérieur à 10 %. Si le problème persiste, déconnecte-toi et réessaye.
-                                        </p>
                                     </div>
                                 ) : (
-                                    <div className="text-[14px] text-[#dbdee1]" style={fontStyle}>
-                                        <p className="text-[#b5bac1] leading-relaxed">
+                                    <div className="text-[14px] text-cyan-100/70" style={fontStyle}>
+                                        <p className="leading-relaxed">
                                             La transmission vocale et vidéo n'est pas complètement chiffrée de bout en bout pour le moment sur DiscordWASM. Notre protocole de signalisation est sécurisé, mais l'architecture serveur (SFU) nécessite de déchiffrer les flux média (DTLS/SRTP) en mémoire pour les redistribuer aux autres pairs.
                                         </p>
                                     </div>
                                 )}
                             </div>
-                            <div className="bg-[#2b2d31] p-3 rounded-b-[8px] flex items-center justify-between border-t border-[#1e1f22]">
-                                <div className="flex items-center text-[#23a55a] text-[12px] font-semibold">
+                            <div className="bg-[#0a0b14] p-3 rounded-b-xl flex items-center justify-between border-t border-cyan-500/20">
+                                <div className="flex items-center text-cyan-400 text-[12px] font-semibold">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                                     Chiffré de bout en bout
                                 </div>
-                                <a href="#" className="text-[#00a8fc] hover:underline text-[12px] font-medium">En savoir plus</a>
+                                <a href="#" className="text-blue-400 hover:text-cyan-300 hover:underline text-[12px] font-medium transition-colors">En savoir plus</a>
                             </div>
                         </div>
                     )}
                     <div 
                         ref={voiceConnectedRef}
-                        className="flex items-center flex-1 min-w-0 px-1 py-1 rounded-[4px] hover:bg-[#35373c] cursor-pointer relative group"
+                        className="flex items-center flex-1 min-w-0 px-1 py-1 rounded-lg hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/30 cursor-pointer relative group transition-all duration-300"
                         onMouseEnter={() => setShowPing(true)}
                         onMouseLeave={() => setShowPing(false)}
                         onClick={() => setShowVoiceDetails(prev => !prev)}
@@ -159,20 +162,20 @@ const UserFooter = ({
                         <NetworkIcon quality={isConnected ? networkQuality : 0} />
                         
                         {showPing && isConnected && (
-                            <div className="absolute -top-10 left-0 bg-[#111214] text-white text-[12px] px-2 py-1 rounded-[4px] shadow-xl whitespace-nowrap z-50 animate-in fade-in zoom-in duration-150">
+                            <div className="absolute -top-10 left-0 bg-[#050511] border border-cyan-500/30 text-cyan-300 text-[12px] px-2 py-1 rounded shadow-[0_0_15px_rgba(34,211,238,0.2)] whitespace-nowrap z-50 animate-in fade-in zoom-in duration-150 font-mono">
                                 <span className="font-bold">{ping}ms</span>
-                                <div className="absolute -bottom-1 left-2 w-2 h-2 bg-[#111214] rotate-45" />
+                                <div className="absolute -bottom-1 left-2 w-2 h-2 bg-[#050511] border-b border-r border-cyan-500/30 rotate-45" />
                             </div>
                         )}
 
                         <div className="ml-2 flex flex-col min-w-0 leading-tight">
                             <div 
-                                className={`text-[14px] font-bold truncate ${isConnected ? 'text-[#23a55a]' : 'text-[#80848e]'}`} 
+                                className={`text-[12px] font-black uppercase tracking-wider truncate ${isConnected ? 'text-cyan-400' : 'text-gray-500'}`} 
                                 style={fontStyle}
                             >
                                 {isConnected ? 'Voice Connected' : 'Connecting...'}
                             </div>
-                            <div className="text-[12px] text-[#b5bac1] truncate" style={fontStyle}>
+                            <div className="text-[10px] text-cyan-500/60 uppercase tracking-widest truncate font-bold" style={fontStyle}>
                                 Salon vocal
                             </div>
                         </div>
@@ -181,81 +184,81 @@ const UserFooter = ({
                     <div className="flex items-center gap-1">
                         <button 
                             onClick={onStream}
-                            className={`w-8 h-8 flex items-center justify-center rounded-[4px] transition-colors ${isStreaming ? 'text-[#23a55a] bg-[#23a55a]/10 hover:bg-[#23a55a]/20' : 'text-[#dbdee1] hover:bg-[#35373c] hover:text-[#f2f3f5]'}`}
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors border border-transparent ${isStreaming ? 'text-cyan-400 bg-cyan-500/20 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : 'text-cyan-100/60 hover:bg-cyan-500/10 hover:border-cyan-500/30 hover:text-cyan-200'}`}
                             title={isStreaming ? "Arrêter le stream" : "Lancer un stream"}
                         >
-                            {isStreaming ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
+                            {isStreaming ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
                         </button>
                         <button 
                             onClick={onLeave}
-                            className="w-8 h-8 flex items-center justify-center rounded-[4px] text-[#dbdee1] hover:bg-[#35373c] hover:text-[#ed4245] transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-cyan-100/60 hover:bg-red-500/20 border border-transparent hover:border-red-500/40 hover:text-red-400 hover:shadow-[0_0_10px_rgba(248,113,113,0.3)] transition-colors"
                             title="Quitter le salon"
                         >
-                            <PhoneOff size={20} />
+                            <PhoneOff size={16} />
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className="h-[52px] flex items-center px-2">
-                <div className="flex items-center min-w-0 flex-1 px-1 py-1 rounded-[4px] hover:bg-[#35373c] cursor-pointer transition-colors duration-150">
+            <div className="h-[52px] flex items-center px-2 py-1">
+                <div className="flex items-center min-w-0 flex-1 px-1 py-1 rounded-lg hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/20 cursor-pointer transition-all duration-300">
                     <div className="relative flex-shrink-0">
                         {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" className={`w-8 h-8 rounded-full object-cover transition-all duration-300 ${isSpeaking ? 'ring-2 ring-[#248046]' : ''}`} />
+                            <img src={avatarUrl} alt="Avatar" className={`w-8 h-8 rounded-full object-cover border border-cyan-500/30 transition-all duration-300 ${isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : ''}`} />
                         ) : (
                             <div
-                                className={`w-8 h-8 rounded-full bg-[#5865f2] flex items-center justify-center text-[14px] font-bold text-white transition-all duration-300
-                                ${isSpeaking ? 'ring-2 ring-[#248046]' : ''}`}
+                                className={`w-8 h-8 rounded-full bg-[#050511] border border-cyan-500/30 flex items-center justify-center text-[14px] font-black text-cyan-200 transition-all duration-300
+                                ${isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : ''}`}
                             >
                                 {username.slice(0, 1).toUpperCase()}
                             </div>
                         )}
-                        <div className="absolute -right-0.5 -bottom-0.5 w-3.5 h-3.5 rounded-full bg-[#23a55a] border-[3px] border-[#232428]" />
+                        <div className="absolute -right-0.5 -bottom-0.5 w-3.5 h-3.5 rounded-full bg-cyan-500 border-[3px] border-[#0a0b14] shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
                     </div>
                     
                     <div className="ml-2 flex flex-col justify-center min-w-0 leading-tight">
-                        <div className="text-[14px] font-semibold text-[#f2f3f5] truncate" style={fontStyle}>
+                        <div className="text-[12px] font-black uppercase tracking-wider text-cyan-50 truncate" style={fontStyle}>
                             {username}
                         </div>
-                        <div className="text-[12px] text-[#b5bac1] font-normal" style={fontStyle}>
+                        <div className="text-[10px] text-cyan-500/60 uppercase tracking-widest font-bold" style={fontStyle}>
                             En ligne
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center">
+                <div className="flex items-center gap-0.5">
                     <button
                         onClick={onToggleMute}
                         disabled={!channelId}
-                        className="w-8 h-8 flex items-center justify-center rounded-[4px] text-[#dbdee1] hover:bg-[#35373c] hover:text-[#f2f3f5] transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-cyan-100/70 border border-transparent hover:bg-cyan-500/10 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-transparent"
                     >
-                        {isMuted ? <MicOff size={20} className="text-[#fa777c]" /> : <Mic size={20} />}
+                        {isMuted ? <MicOff size={16} className="text-red-400" /> : <Mic size={16} />}
                     </button>
                     <button
                         onClick={onToggleDeafen}
                         disabled={!channelId}
-                        className="w-8 h-8 flex items-center justify-center rounded-[4px] text-[#dbdee1] hover:bg-[#35373c] hover:text-[#f2f3f5] transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-cyan-100/70 border border-transparent hover:bg-cyan-500/10 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-transparent"
                     >
-                        <Headphones size={20} className={isDeafened ? 'text-[#fa777c]' : ''} />
+                        <Headphones size={16} className={isDeafened ? 'text-red-400' : ''} />
                     </button>
                     <div className="relative">
                         <button
                             ref={buttonRef}
                             onClick={handleSettingsClick}
-                            className={`w-8 h-8 flex items-center justify-center rounded-[4px] text-[#dbdee1] hover:bg-[#35373c] hover:text-[#f2f3f5] transition-colors ${menuOpen ? 'bg-[#35373c] text-[#f2f3f5]' : ''}`}
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-cyan-100/70 border hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors ${menuOpen ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'border-transparent hover:border-cyan-500/30'}`}
                         >
-                            <Settings size={20} />
+                            <Settings size={16} />
                         </button>
                         {menuOpen && (
-                            <div ref={menuRef} className="absolute right-0 bottom-[48px] mb-2 w-[220px] bg-[#111214] rounded-[4px] shadow-xl py-2 px-2 z-50 border border-black/20">
-                                <button onClick={updateCheck} className="w-full flex items-center justify-between px-2 py-1.5 text-[14px] text-[#dbdee1] rounded-[2px] hover:bg-[#4752c4] hover:text-white transition-colors mb-1" style={fontStyle}>
-                                    Vérifier les mises à jour
-                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                            <div ref={menuRef} className="absolute right-0 bottom-full mb-2 w-[220px] bg-[#050511]/95 backdrop-blur-md rounded-xl shadow-[0_0_30px_rgba(34,211,238,0.15)] py-2 px-2 z-50 border border-cyan-500/30">
+                                <button onClick={updateCheck} className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-bold tracking-wide uppercase text-cyan-100/80 rounded-lg hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors mb-1" style={fontStyle}>
+                                    System Update
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="text-cyan-400"><path d="M12 4v16m8-8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                                 </button>
-                                <div className="h-[1px] bg-[#ffffff]/[0.06] my-1" />
-                                <button onClick={onLogout} className="w-full flex items-center justify-between px-2 py-1.5 text-[14px] text-[#fa777c] rounded-[2px] hover:bg-[#fa777c] hover:text-white transition-colors" style={fontStyle}>
-                                    Se déconnecter
-                                    <LogOut size={16} />
+                                <div className="h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent my-1" />
+                                <button onClick={onLogout} className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-bold tracking-wide uppercase text-red-500/80 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition-colors" style={fontStyle}>
+                                    Disconnect
+                                    <LogOut size={14} className="text-red-400" />
                                 </button>
                             </div>
                         )}

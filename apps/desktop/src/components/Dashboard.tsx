@@ -15,6 +15,8 @@ import { ChatPanel } from './chat/ChatPanel';
 import { UserContextMenu } from './ui/UserContextMenu';
 import { SettingsModal } from './ui/SettingsModal';
 import { Download, X } from 'lucide-react';
+import { useServer } from '../context/ServerContext';
+import { ChannelList } from './channel/ChannelList';
 
 /**
  * Main application dashboard integrating voice, text chat, and stream viewing.
@@ -51,6 +53,8 @@ const Dashboard = () => {
         setUserVolume,
         voiceAvatar
     } = useVoiceStore();
+
+    const { servers, activeServerId, createChannel, deleteChannel } = useServer();
 
     const [activeView, setActiveView] = useState<SidebarView>('voice');
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, userId: string, username: string } | null>(null);
@@ -151,13 +155,21 @@ const Dashboard = () => {
 
     /**
      * Rejoindre un channel, et stopper le stream d'écran existant.
-     * @param targetChannelId Identifiant du canal cible
+     * @param {string} targetChannelId Identifiant du canal cible
+     * @param {'voice' | 'text' | 'video'} type Type de canal
      */
-    const customJoinChannel = (targetChannelId: string) => {
+    const customJoinChannel = (targetChannelId: string, type: 'voice' | 'text' | 'video' = 'voice') => {
+        if (type === 'text') {
+            setActiveView('chat');
+            // Store text channel ID somewhere or use it for chat
+            return;
+        }
+
         if (channelId && channelId !== targetChannelId && isStreaming) {
             stopCapture();
         }
         joinChannel(targetChannelId, safeUsername);
+        setActiveView('voice');
     };
 
     /**
@@ -170,30 +182,51 @@ const Dashboard = () => {
         leaveChannel();
     };
 
+    const activeServer = servers.find(s => s.id === activeServerId);
+
     return (
-        <div className="flex h-screen bg-[#1e1f22] text-gray-100 overflow-hidden font-sans">
+        <div className="flex h-screen bg-[#0a0014] text-gray-100 overflow-hidden font-sans">
             <MainLayout
                 channelName={channelName}
                 sidebar={
-                    <SidebarContent
-                        channelId={channelId}
-                        isConnected={isConnected}
-                        isMuted={isMuted}
-                        isDeafened={isDeafened}
-                        error={error}
-                        onJoin={customJoinChannel}
-                        onLeave={customLeaveChannel}
-                        onToggleMute={toggleMute}
-                        onToggleDeafen={toggleDeafen}
-                        onLogout={handleLogout}
-                        updateCheck={checkForUpdate}
-                        salons={salons}
-                        localUserId={localUserId}
-                        activeView={activeView}
-                        onViewChange={setActiveView}
-                        speakingUsers={speakingUsers}
-                        channelStartedAt={channelStartedAt}
-                    />
+                    (activeServerId && activeServerId !== 'sos' && activeServer) ? (
+                        <ChannelList
+                            server={activeServer}
+                            activeChannelId={channelId}
+                            onSelectChannel={(cId) => {
+                                const channel = activeServer.channels.find(c => c.id === cId);
+                                if (channel) {
+                                    customJoinChannel(cId, channel.type);
+                                }
+                            }}
+                            onCreateChannel={(channel) => createChannel(activeServer.id, channel)}
+                            onDeleteChannel={(cId) => deleteChannel(activeServer.id, cId)}
+                            isOwner={true} // TODO: Check if user is owner
+                            participants={participants}
+                            speakingUsers={speakingUsers}
+
+                        />
+                    ) : (
+                        <SidebarContent
+                            channelId={channelId}
+                            isConnected={isConnected}
+                            isMuted={isMuted}
+                            isDeafened={isDeafened}
+                            error={error}
+                            onJoin={customJoinChannel}
+                            onLeave={customLeaveChannel}
+                            onToggleMute={toggleMute}
+                            onToggleDeafen={toggleDeafen}
+                            onLogout={handleLogout}
+                            updateCheck={checkForUpdate}
+                            salons={salons}
+                            localUserId={localUserId}
+                            activeView={activeView}
+                            onViewChange={setActiveView}
+                            speakingUsers={speakingUsers}
+                            channelStartedAt={channelStartedAt}
+                        />
+                    )
                 }
                 sidebarFooter={
                     <UserFooter
@@ -222,9 +255,9 @@ const Dashboard = () => {
                 ) : (
                     <div className={`flex flex-col h-full gap-3 ${focusedUserId ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                         {focusedUserId && (
-                            <div className="flex-1 min-h-0 w-full bg-black rounded-lg overflow-hidden flex items-center justify-center relative shadow-lg mt-4">
+                            <div className="flex-1 min-h-0 w-full bg-[#050511]/80 border border-cyan-500/20 backdrop-blur-md rounded-xl overflow-hidden flex items-center justify-center relative shadow-[0_0_30px_rgba(34,211,238,0.1)] mt-4">
                                 <button 
-                                    className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/80 text-white rounded px-3 py-1 backdrop-blur-sm transition-colors"
+                                    className="absolute top-4 right-4 z-50 bg-[#0a0b14]/80 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-100 rounded-lg px-4 py-1.5 backdrop-blur-sm transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                                     onClick={() => setFocusedUserId(null)}
                                 >
                                     Réduire
@@ -256,10 +289,10 @@ const Dashboard = () => {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className={`w-32 h-32 rounded-full bg-[#3f4147] flex items-center justify-center text-5xl font-bold mb-4 ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}`}>
+                                                                <div className={`w-32 h-32 rounded-full bg-[#050511] border border-cyan-500/20 text-cyan-200 flex items-center justify-center text-6xl font-black mb-6 shadow-[0_0_40px_rgba(34,211,238,0.15)] relative ${isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_40px_rgba(34,211,238,0.5)] scale-105 transition-all duration-300' : 'transition-all duration-500'}`}>
                                                                 {safeUsername.slice(0, 1).toUpperCase()}
                                                             </div>
-                                                            <span className="text-2xl font-semibold">{safeUsername}</span>
+                                                            <span className="text-xl tracking-[0.2em] font-black uppercase text-cyan-100/80 bg-[#0a0b14]/50 backdrop-blur border border-cyan-500/10 px-4 py-1.5 rounded">{safeUsername}</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -281,11 +314,12 @@ const Dashboard = () => {
                                     }
 
                                     return (
-                                        <div key={`focus-${card.id}`} className="w-full h-full flex flex-col items-center justify-center text-white">
-                                            <div className={`w-32 h-32 rounded-full bg-[#3f4147] flex items-center justify-center text-5xl font-bold mb-4 ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}`}>
+                                        <div key={`focus-${card.id}`} className="w-full h-full flex flex-col items-center justify-center text-cyan-100 relative">
+                                            <div className="absolute inset-0 transition-opacity duration-1000 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent pointer-events-none" />
+                                            <div className={`w-32 h-32 rounded-full bg-[#050511] border border-cyan-500/20 text-cyan-200 flex items-center justify-center text-6xl font-black mb-6 shadow-[0_0_40px_rgba(34,211,238,0.15)] relative z-10 ${isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_50px_rgba(34,211,238,0.5)] scale-105 transition-all duration-300' : 'transition-all duration-500'}`}>
                                                 {card.username.slice(0, 1).toUpperCase()}
                                             </div>
-                                            <span className="text-2xl font-semibold">{card.username}</span>
+                                            <span className="text-xl tracking-[0.2em] font-black uppercase text-cyan-100/80 bg-[#0a0b14]/50 backdrop-blur border border-cyan-500/10 px-4 py-1.5 rounded relative z-10">{card.username}</span>
                                         </div>
                                     );
                                 })}
@@ -304,8 +338,8 @@ const Dashboard = () => {
                                 const isSpeaking = speakingUsers.get(card.id) ?? false;
                                 
                                         const cardClassName = focusedUserId
-                                    ? `relative flex-shrink-0 w-60 h-full rounded-lg overflow-hidden bg-[#232428] border border-black/30 transition-all duration-300 hover:scale-[1.02] cursor-pointer snap-center ${focusedUserId === card.id ? 'ring-2 ring-blue-500 ring-inset' : ''}`
-                                    : `relative flex flex-col items-center justify-center aspect-video w-[92%] max-w-[92%] mx-auto rounded-lg overflow-hidden bg-[#232428] border border-black/30 transition-all duration-300 hover:scale-[1.01] cursor-pointer ${isSpeaking ? 'ring-4 ring-green-500 ring-offset-4 ring-offset-[#313338] shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}`;
+                                    ? `relative shrink-0 w-60 h-full rounded-xl overflow-hidden bg-[#0d0f1a]/80 border border-cyan-500/20 backdrop-blur-md transition-all duration-500 hover:scale-[1.02] cursor-pointer snap-center shadow-[0_4px_20px_rgba(0,0,0,0.3)] ${focusedUserId === card.id ? 'ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.3)]' : ''}`
+                                    : `relative flex flex-col items-center justify-center aspect-video w-[92%] max-w-[92%] mx-auto rounded-xl overflow-hidden bg-[#0d0f1a]/80 border border-cyan-500/20 backdrop-blur-md transition-all duration-500 hover:scale-[1.02] cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-cyan-400/50 hover:shadow-[0_0_25px_rgba(34,211,238,0.2)] ${isSpeaking ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#050511] shadow-[0_0_30px_rgba(34,211,238,0.5)]' : ''}`;
 
                                 const handleCardClick = () => setFocusedUserId(card.id);
 
@@ -316,17 +350,17 @@ const Dashboard = () => {
                                                 {focusedUserId === card.id ? (
                                                     <>
                                                         <div className="absolute inset-0 flex items-center justify-center bg-[#1e1f22]">
-                                                            <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-[#3f4147] text-white text-xl font-bold transition-all duration-300 ${
-                                                                isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
+                                                                <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-cyan-600/40 to-purple-600/40 text-cyan-50 font-black text-xl transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-cyan-500/30 ${
+                                                                isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.6)] scale-110' : ''
                                                             }`}>
                                                                 {safeUsername.slice(0, 1).toUpperCase()}
-                                                                <div className="absolute -bottom-1 -right-1 bg-[#1e1f22] rounded-full p-1 border-2 border-[#232428]">
-                                                                    <Video size={12} className="text-white" />
+                                                                <div className="absolute -bottom-1 -right-1 bg-[#050511] rounded-full p-1 border border-cyan-500/50">
+                                                                    <Video size={10} className="text-cyan-400" />
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
-                                                            <span className="text-xs font-bold text-white">{safeUsername}</span>
+                                                        <div className="absolute bottom-2 left-2 bg-[#050511]/80 backdrop-blur-md border border-cyan-500/20 px-3 py-1 rounded-md flex items-center gap-2">
+                                                            <span className="text-[10px] uppercase font-bold text-cyan-200 tracking-wider mix-blend-screen">{safeUsername}</span>
                                                         </div>
                                                     </>
                                                 ) : (
@@ -356,12 +390,13 @@ const Dashboard = () => {
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <div className="flex flex-col items-center justify-center w-full h-full">
-                                                        <div className={`${focusedUserId ? 'w-16 h-16 text-2xl' : 'w-24 h-24 text-4xl'} rounded-full bg-[#3f4147] text-white flex items-center justify-center font-bold mb-2`}>
+                                                    <div className="flex flex-col items-center justify-center w-full h-full relative">
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-cyan-900/10 via-transparent to-purple-900/10 pointer-events-none" />
+                                                        <div className={`${focusedUserId ? 'w-16 h-16 text-2xl' : 'w-24 h-24 text-4xl'} rounded-full bg-[#050511] border border-cyan-500/30 text-cyan-200 flex items-center justify-center font-black mb-3 shadow-[0_0_30px_rgba(34,211,238,0.15)] relative z-10`}>
                                                             {safeUsername.slice(0, 1).toUpperCase()}
                                                         </div>
-                                                        <span className={`${focusedUserId ? 'text-sm' : 'text-lg'} font-semibold text-gray-200`}>{safeUsername}</span>
-                                                        {!focusedUserId && <span className="text-xs text-gray-400 mt-1">Aucun stream en cours</span>}
+                                                        <span className={`${focusedUserId ? 'text-xs' : 'text-sm'} font-bold tracking-widest uppercase text-cyan-100 relative z-10 bg-[#050511]/50 px-3 py-1 rounded-md border border-cyan-500/20 backdrop-blur-sm`}>{safeUsername}</span>
+                                                        {!focusedUserId && <span className="text-[10px] uppercase tracking-widest text-cyan-500/50 mt-3 relative z-10 font-bold bg-[#0a0b14] px-2 py-0.5 rounded border border-cyan-500/10">No Stream</span>}
                                                     </div>
                                                 )}
                                             </div>
@@ -377,17 +412,17 @@ const Dashboard = () => {
                                             {focusedUserId === card.id ? (
                                                 <>
                                                     <div className="absolute inset-0 flex items-center justify-center bg-[#1e1f22]">
-                                                        <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-[#3f4147] text-white text-xl font-bold transition-all duration-300 ${
-                                                            isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
+                                                                <div className={`relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-cyan-600/40 to-purple-600/40 text-cyan-50 font-black text-xl transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-cyan-500/30 ${
+                                                            isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.6)] scale-110' : ''
                                                         }`}>
                                                             {card.username.slice(0, 1).toUpperCase()}
-                                                            <div className="absolute -bottom-1 -right-1 bg-[#1e1f22] rounded-full p-1 border-2 border-[#232428]">
-                                                                <Video size={12} className="text-white" />
+                                                            <div className="absolute -bottom-1 -right-1 bg-[#050511] rounded-full p-1 border border-cyan-500/50">
+                                                                <Video size={10} className="text-cyan-400" />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-white">{card.username}</span>
+                                                    <div className="absolute bottom-2 left-2 bg-[#050511]/80 backdrop-blur-md border border-cyan-500/20 px-3 py-1 rounded-md flex items-center gap-2">
+                                                        <span className="text-[10px] uppercase font-bold text-cyan-200 tracking-wider mix-blend-screen">{card.username}</span>
                                                     </div>
                                                 </>
                                             ) : (
@@ -406,18 +441,21 @@ const Dashboard = () => {
                                         key={card.id} 
                                         onClick={handleCardClick}
                                         onContextMenu={(e) => handleContextMenu(e, card.id, card.username)}
-                                        className={`${cardClassName} !bg-[#1e1f22]`}
+                                        className={`${cardClassName} !bg-[#050511]`}
                                     >
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/10 via-transparent to-purple-900/10 pointer-events-none" />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className={`${focusedUserId ? 'w-16 h-16 text-xl' : 'w-20 h-20 text-2xl'} rounded-full bg-[#3f4147] text-white flex items-center justify-center font-bold transition-all duration-300`}>
+                                            <div className={`${focusedUserId ? 'w-14 h-14 text-xl' : 'w-20 h-20 text-3xl'} rounded-full bg-[#0a0b14] border border-cyan-500/30 text-cyan-200 flex items-center justify-center font-black transition-all duration-500 shadow-[0_0_20px_rgba(34,211,238,0.15)] relative z-10 ${
+                                                isSpeaking ? 'ring-2 ring-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.5)] scale-110' : ''
+                                            }`}>
                                                 {card.username.slice(0, 1).toUpperCase()}
                                             </div>
                                         </div>
-                                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                                                isSpeaking ? 'bg-green-500 animate-pulse' : card.username === 'Slot libre' ? 'bg-gray-500' : 'bg-green-500'
+                                        <div className="absolute bottom-3 left-3 bg-[#0a0b14]/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-cyan-500/20 shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2.5 z-20">
+                                            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 shadow-[0_0_10px_currentColor] ${
+                                                isSpeaking ? 'bg-cyan-400 animate-pulse' : card.username === 'Slot libre' ? 'bg-gray-600' : 'bg-cyan-500/50'
                                             }`} />
-                                            <span className="text-xs font-bold text-white">{card.username}</span>
+                                            <span className="text-[10px] tracking-widest font-black text-cyan-50 uppercase">{card.username}</span>
                                         </div>
                                     </div>
                                 );

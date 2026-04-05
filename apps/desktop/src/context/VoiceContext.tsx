@@ -70,6 +70,14 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     // Add rawMicVolumeRef for SettingsModal
     const rawMicVolumeRef = useRef<number>(0);
     
+    const [selectedMic, setSelectedMic] = useState(() => localStorage.getItem('selectedMic') || '');
+    const [selectedSpeaker, setSelectedSpeaker] = useState(() => localStorage.getItem('selectedSpeaker') || '');
+    const [webrtcNoiseSuppressionEnabled, setWebrtcNoiseSuppressionEnabled] = useState(() => localStorage.getItem('webrtcNoiseSuppression') !== 'false');
+
+    useEffect(() => { localStorage.setItem('selectedMic', selectedMic); }, [selectedMic]);
+    useEffect(() => { localStorage.setItem('selectedSpeaker', selectedSpeaker); }, [selectedSpeaker]);
+    useEffect(() => { localStorage.setItem('webrtcNoiseSuppression', webrtcNoiseSuppressionEnabled.toString()); }, [webrtcNoiseSuppressionEnabled]);
+
     useEffect(() => { localStorage.setItem('vadAuto', vadAuto.toString()); }, [vadAuto]);
     useEffect(() => { localStorage.setItem('vadThreshold', vadThreshold.toString()); }, [vadThreshold]);
     useEffect(() => { localStorage.setItem('vadMode', vadMode); }, [vadMode]);
@@ -376,11 +384,18 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         sendSignal({ type: 'leave', channelId: prevChannel, userId: userIdRef.current });
 
         try {
-            const rawStream = await navigator.mediaDevices.getUserMedia({ audio: {
+            const selectedMicId = localStorage.getItem('selectedMic');
+            const webrtcNoiseSuppression = localStorage.getItem('webrtcNoiseSuppression') !== 'false';
+            const audioConstraints: MediaTrackConstraints = {
                 echoCancellation: true,
-                noiseSuppression: true,
+                noiseSuppression: webrtcNoiseSuppression,
                 autoGainControl: true,
-            } });
+            };
+            if (selectedMicId) {
+                audioConstraints.deviceId = { exact: selectedMicId };
+            }
+
+            const rawStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
 
             const audioCtx = new window.AudioContext();
             const source = audioCtx.createMediaStreamSource(rawStream);
@@ -500,13 +515,14 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         toggleMute, toggleDeafen,
         remoteStreams, remoteVideoStreams,
         addScreenTrack, removeScreenTrack,
-        userVolumes, setUserVolume: (id:
- string, vol: number) => setUserVolumes(p => new Map(p).set(id, vol)),
+        userVolumes, setUserVolume: (id: string, vol: number) => setUserVolumes(p => new Map(p).set(id, vol)),
         networkQuality, ping, averagePing, packetLoss, chatMessages, sendChatMessage, setUserInfo,
-        smartGateEnabled, setSmartGateEnabled
-    }), [channelId, participants, isConnected, isMuted, isDeafened, error, localUserId, localStream, channelStartedAt, bandwidthStats, joinChannel, leaveChannel, toggleMute, toggleDeafen, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack, userVolumes, networkQuality, ping, averagePing, packetLoss, chatMessages, sendChatMessage, setUserInfo, smartGateEnabled]);
+        smartGateEnabled, setSmartGateEnabled,
+        selectedMic, setSelectedMic,
+        selectedSpeaker, setSelectedSpeaker
+    }), [channelId, participants, isConnected, isMuted, isDeafened, error, localUserId, localStream, channelStartedAt, bandwidthStats, joinChannel, leaveChannel, toggleMute, toggleDeafen, remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack, userVolumes, networkQuality, ping, averagePing, packetLoss, chatMessages, sendChatMessage, setUserInfo, smartGateEnabled, selectedMic, selectedSpeaker]);
 
-    return <VoiceContext.Provider value={{...value, vadAuto, setVadAuto, vadThreshold, setVadThreshold, vadMode, setVadMode, pttKey, setPttKey, isPttActive, voiceAvatar, setVoiceAvatar, rawMicVolumeRef}}>{children}</VoiceContext.Provider>;
+    return <VoiceContext.Provider value={{...value, vadAuto, setVadAuto, vadThreshold, setVadThreshold, vadMode, setVadMode, pttKey, setPttKey, isPttActive, voiceAvatar, setVoiceAvatar, rawMicVolumeRef, webrtcNoiseSuppressionEnabled, setWebrtcNoiseSuppressionEnabled}}>{children}</VoiceContext.Provider>;
 };
 
 export const useVoiceStore = () => {

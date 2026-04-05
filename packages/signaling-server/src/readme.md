@@ -170,7 +170,7 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=Mirage2000
+      - GF_SECURITY_ADMIN_PASSWORD=change_me
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -250,13 +250,13 @@ global:
 scrape_configs:
   - job_name: 'signaling-server'
     static_configs:
-      - targets: ['89.168.59.45:3001']
+      - targets: ['your_server_ip:3001']
     metrics_path: /metrics
     scrape_interval: 5s
 
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['89.168.59.45:9100']
+      - targets: ['your_server_ip:9100']
 
   - job_name: 'alertmanager'
     static_configs:
@@ -275,7 +275,7 @@ Importer le dashboard pour visualiser :
 ## **Connection**
 
 ```typescript
-const ws = new WebSocket('wss://89.168.59.45:3001/ws');
+const ws = new WebSocket('wss://your_server_ip:3001/ws');
 
 ws.onopen = () => {
   console.log('Connected to signaling server');
