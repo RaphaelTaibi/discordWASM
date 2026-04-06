@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useServer } from '../../context/ServerContext';
 import { X, Globe, Plus } from 'lucide-react';
-
-interface ServerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import ServerModalProps from '../../models/serverModalProps.model';
 
 export const ServerModal = ({ isOpen, onClose }: ServerModalProps) => {
   const { createServer, joinServer } = useServer();

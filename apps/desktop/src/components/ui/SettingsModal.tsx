@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, User, Mic, Gamepad2, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SettingsModalProps } from '../../models/settingsModalProps.model';
@@ -48,7 +48,7 @@ export const SettingsModal = ({ isOpen, onClose, updateAvailable, updateStatus, 
                             }`}
                             onClick={() => setActiveTab('profile')}
                         >
-                            Mon Profil
+                            <User size={16} /> Mon Profil
                         </button>
                         
                         <button 
@@ -59,7 +59,7 @@ export const SettingsModal = ({ isOpen, onClose, updateAvailable, updateStatus, 
                             }`}
                             onClick={() => setActiveTab('voice')}
                         >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                            <Mic size={16} />
                             Voix & Vidéo
                         </button>
                     </nav>
@@ -76,7 +76,7 @@ export const SettingsModal = ({ isOpen, onClose, updateAvailable, updateStatus, 
                             }`}
                             onClick={() => setActiveTab('activity')}
                         >
-                            Jeux enregistrés
+                            <Gamepad2 size={16} /> Jeux enregistrés
                         </button>
                     </nav>
                     
@@ -92,7 +92,7 @@ export const SettingsModal = ({ isOpen, onClose, updateAvailable, updateStatus, 
                             }`}
                             onClick={() => setActiveTab('update')}
                         >
-                            Mises à jour 
+                            <RefreshCw size={16} /> Mises à jour
                             {updateAvailable && <span className="w-2.5 h-2.5 bg-red-400 rounded-full" />}
                         </button>
                     </nav>
@@ -101,8 +101,8 @@ export const SettingsModal = ({ isOpen, onClose, updateAvailable, updateStatus, 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col relative glass-light z-10 w-full">
                     <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent pointer-events-none" />
-                    <div className="absolute top-6 right-6 z-50">
-                        <button 
+                    <div className="absolute top-6 right-3 z-50">
+                        <button
                             className="w-8 h-8 rounded-full border border-[#1a3a4c] text-gray-400 flex items-center justify-center hover:text-white hover:border-cyan-400 transition-colors"
                             onClick={onClose}
                         >

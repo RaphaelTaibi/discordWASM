@@ -25,4 +25,10 @@ export default interface ExtendedVoiceState extends VoiceState {
     rawMicVolumeRef: React.MutableRefObject<number>;
     averagePing: number;
     packetLoss: number;
+    webrtcNoiseSuppressionEnabled: boolean;
+    setWebrtcNoiseSuppressionEnabled: (enabled: boolean) => void;
+    selectedMic: string;
+    setSelectedMic: (deviceId: string) => void;
+    selectedSpeaker: string;
+    setSelectedSpeaker: (deviceId: string) => void;
 }

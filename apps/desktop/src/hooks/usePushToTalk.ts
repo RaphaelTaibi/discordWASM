@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-interface UsePushToTalkProps {
-    vadMode: 'VAD' | 'PTT';
-    pttKey: string;
-    isMuted: boolean;
-    localStreamRef: React.MutableRefObject<MediaStream | null>;
-}
+import UsePushToTalkProps from '../models/usePushToTalkProps.model';
 
 export const usePushToTalk = ({ vadMode, pttKey, isMuted, localStreamRef }: UsePushToTalkProps) => {
     const [isPttActive, setIsPttActive] = useState(false);

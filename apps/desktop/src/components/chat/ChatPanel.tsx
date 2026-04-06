@@ -3,6 +3,9 @@ import { useChatStore } from '../../context/ChatContext';
 import { useVoiceStore } from '../../context/VoiceContext';
 import { Send } from 'lucide-react';
 import { useBentoLayout } from "../../hooks/useBentoLayout";
+import { useBentoDrag } from "../../hooks/useBentoDrag";
+import { useBentoResize } from "../../hooks/useBentoResize";
+import ResizeHandle from "../layout/ResizeHandle";
 
 const MAX_CHARACTERS = 300;
 
@@ -12,15 +15,15 @@ const formatTime = (timestamp: number) => {
 
 export const ChatPanel = () => {
     const { chatMessages, sendChatMessage } = useChatStore();
-    const { localUserId, avatarUrl: voiceAvatar } = useVoiceStore() as any; // Using any as workaround if it doesn't exist yet
+    const { localUserId, voiceAvatar } = useVoiceStore();
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Connect to Bento layout system
-    const { ref, x, y, w, h, onMove } = useBentoLayout("chat-panel");
+    const { x, y, w, h, onMove, onResize } = useBentoLayout("chat-panel");
+    const handleDragStart = useBentoDrag(onMove);
+    const handleResizeStart = useBentoResize(onResize, "corner");
 
-    // Scroll automatique
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatMessages]);
@@ -34,27 +37,8 @@ export const ChatPanel = () => {
         }
     };
 
-    let dragStart = { x: 0, y: 0 };
-    let mouseStart = { x: 0, y: 0 };
-    const handleDrag = (e: React.MouseEvent) => {
-        mouseStart = { x: e.clientX, y: e.clientY };
-        dragStart = { x, y };
-        const onMoveHandler = (moveEvent: MouseEvent) => {
-            const dx = moveEvent.clientX - mouseStart.x;
-            const dy = moveEvent.clientY - mouseStart.y;
-            onMove({ dx, dy });
-        };
-        const onUpHandler = () => {
-            window.removeEventListener("mousemove", onMoveHandler);
-            window.removeEventListener("mouseup", onUpHandler);
-        };
-        window.addEventListener("mousemove", onMoveHandler);
-        window.addEventListener("mouseup", onUpHandler);
-    };
-
     return (
         <div
-            ref={ref}
             className="absolute z-30"
             style={{
                 left: x,
@@ -68,7 +52,7 @@ export const ChatPanel = () => {
         >
             {/* Drag handle */}
             <div
-                onMouseDown={handleDrag}
+                onMouseDown={handleDragStart}
                 className="shrink-0 h-4 cursor-grab active:cursor-grabbing flex items-center justify-center hover:bg-white/[0.04] transition-colors"
             >
                 <div className="w-8 h-1 rounded-full bg-white/[0.12]" />
@@ -168,6 +152,7 @@ export const ChatPanel = () => {
                 <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
             </div>
+            <ResizeHandle onMouseDown={handleResizeStart} />
         </div>
     );
 };

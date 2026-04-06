@@ -25,3 +25,13 @@ export interface LayoutWindow {
 export interface LayoutBatchUpdate {
   windows: LayoutWindow[];
 }
+
+/**
+ * Context value for BentoLayout state management.
+ */
+export interface BentoLayoutContextValue {
+  windows: LayoutWindow[];
+  setWindows: (windows: LayoutWindow[]) => void;
+  updateBatch: (batch: LayoutBatchUpdate) => void;
+}
+

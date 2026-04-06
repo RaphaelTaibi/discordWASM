@@ -1,13 +1,6 @@
 import { Monitor, Video, Eye, EyeOff, Activity } from "lucide-react";
 import { useState } from "react";
-
-interface GameInfo {
-    id: string;
-    name: string;
-    lastPlayed: string;
-    verified: boolean;
-    overlayEnabled: boolean;
-}
+import GameInfo from '../../models/gameInfo.model';
 
 export const ActivitySettings = () => {
     // Mock data for now, later we'll fetch this from a store or Tauri backend

@@ -1,13 +1,5 @@
 import { Hash, Volume2, Video, Trash2 } from 'lucide-react';
-import { ServerChannel } from '../../models/server.model';
-
-interface ChannelItemProps {
-  channel: ServerChannel;
-  isActive: boolean;
-  onSelect: (channelId: string) => void;
-  onDelete?: (channelId: string) => void;
-  showActions?: boolean;
-}
+import ChannelItemProps from '../../models/channelItemProps.model';
 
 /**
  * Reusable channel item component displaying a channel with its icon based on type.

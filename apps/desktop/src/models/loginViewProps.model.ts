@@ -1,4 +1,5 @@
 export default interface LoginViewProps {
-    onLogin: (username: string) => void;
+    onLogin: (pseudo: string, password: string) => void;
+    onRecover: (pseudo: string, password: string) => void;
 }
 

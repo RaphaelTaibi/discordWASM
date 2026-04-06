@@ -12,14 +12,14 @@ export const ServerSidebar = () => {
             {/* VOID Logo — Home */}
             <div
                 className={`relative w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold transition-all duration-300 cursor-pointer overflow-hidden shrink-0 group/sos
-                    ${activeServerId === 'sos'
+                    ${activeServerId === null
                         ? 'shadow-[0_0_15px_rgba(34,211,238,0.5)] border border-cyan-400/50'
                         : 'border border-cyan-500/20 hover:border-cyan-400/50 hover:shadow-[0_0_12px_rgba(34,211,238,0.3)]'}`}
-                onClick={() => setActiveServerId('sos')}
+                onClick={() => setActiveServerId(null)}
             >
                 <img src={bgImage} alt="VOID" className="absolute inset-0 w-full h-full object-cover object-left-top scale-[3] opacity-90" />
                 <div className="absolute inset-0 bg-[#020208]/30" />
-                <div className={`absolute inset-0 bg-gradient-to-tr from-cyan-400/20 to-blue-400/20 opacity-0 transition-opacity duration-300 ${activeServerId !== 'sos' ? 'group-hover/sos:opacity-100' : ''}`} />
+                <div className={`absolute inset-0 bg-gradient-to-tr from-cyan-400/20 to-blue-400/20 opacity-0 transition-opacity duration-300 ${activeServerId !== null ? 'group-hover/sos:opacity-100' : ''}`} />
                 <span className="relative z-10 text-[12px] font-black text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">V</span>
             </div>
 

@@ -31,6 +31,9 @@ rustls-pki-types = "1.14.0"
 # Cryptographie
 sha2 = "0.10"
 base64 = "0.22"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+argon2 = "0.5"
 
 # Asynchrone
 tokio = { version = "1", features = ["full"] }

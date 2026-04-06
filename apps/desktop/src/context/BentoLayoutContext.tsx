@@ -1,15 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import type { LayoutWindow, LayoutBatchUpdate } from "../models/layout.model";
-
-/**
- * Context for Bento Tactile layout management.
- * Stores the layout state and provides update methods.
- */
-interface BentoLayoutContextValue {
-  windows: LayoutWindow[];
-  setWindows: (windows: LayoutWindow[]) => void;
-  updateBatch: (batch: LayoutBatchUpdate) => void;
-}
+import type { LayoutWindow, LayoutBatchUpdate, BentoLayoutContextValue } from "../models/layout.model";
 
 const BentoLayoutContext = createContext<BentoLayoutContextValue | undefined>(undefined);
 

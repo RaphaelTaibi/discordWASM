@@ -1,20 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, Plus, Settings, Hash } from 'lucide-react';
-import { Server, ServerChannel } from '../../models/server.model';
+import { ServerChannel } from '../../models/server.model';
 import { ChannelItem } from './ChannelItem';
 import { CreateChannelModal } from './CreateChannelModal';
-import VoicePeer from '../../models/voicePeer.model';
-
-interface ChannelListProps {
-  server: Server;
-  activeChannelId: string | null;
-  onSelectChannel: (channelId: string) => void;
-  onCreateChannel: (channel: Omit<ServerChannel, 'id'>) => void;
-  onDeleteChannel?: (channelId: string) => void;
-  isOwner?: boolean;
-  participants?: VoicePeer[];
-  speakingUsers?: Map<string, boolean>;
-}
+import ChannelListProps from '../../models/channelListProps.model';
 
 /**
  * Displays the list of channels for a server with category headers.

@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Hash, Volume2, Video, X } from 'lucide-react';
-import { ServerChannel } from '../../models/server.model';
-
-interface CreateChannelModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (channel: Omit<ServerChannel, 'id'>) => void;
-}
+import CreateChannelModalProps from '../../models/createChannelModalProps.model';
 
 type ChannelType = 'text' | 'voice' | 'video';
 
@@ -38,15 +32,15 @@ export const CreateChannelModal = ({ isOpen, onClose, onCreate }: CreateChannelM
   ];
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#000000]/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="w-[450px] bg-[#0a0b14] border border-cyan-500/30 rounded-2xl overflow-hidden text-cyan-100 shadow-[0_0_50px_rgba(34,211,238,0.15)] relative">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#000000]/70 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="w-[450px] glass-modal rounded-2xl overflow-hidden text-cyan-100 relative">
         {/* Glow effect */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 flex justify-center">
             <div className="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 blur-[4px]"></div>
             <div className="absolute w-1/2 h-full bg-cyan-200 blur-[2px]"></div>
         </div>
 
-        <div className="flex justify-between items-center px-6 py-5 bg-[#050511]/80 border-b border-cyan-500/10">
+        <div className="flex justify-between items-center px-6 py-5 glass-heavy border-b border-cyan-500/10">
           <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 tracking-wider uppercase">Créer un salon</h2>
           <button onClick={onClose} className="text-cyan-500/50 hover:text-cyan-300 hover:scale-110 transition-all duration-200 focus:outline-none">
             <X size={22} />
@@ -67,11 +61,11 @@ export const CreateChannelModal = ({ isOpen, onClose, onCreate }: CreateChannelM
                   onClick={() => setType(option.value)}
                   className={`flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-300 ${
                     type === option.value
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,0.15)]'
-                      : 'bg-[#050511] border-cyan-500/20 text-cyan-500/70 hover:bg-cyan-500/10 hover:text-cyan-300 hover:border-cyan-500/40'
+                      ? 'glass-heavy border-cyan-400 text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,0.15)]'
+                      : 'glass border-cyan-500/20 text-cyan-500/70 hover:bg-cyan-500/10 hover:text-cyan-300 hover:border-cyan-500/40'
                   }`}
                 >
-                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${type === option.value ? 'bg-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-[#0a0b14]'}`}>
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${type === option.value ? 'bg-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-white/[0.04]'}`}>
                     {option.icon}
                   </div>
                   <span className="font-bold tracking-wide">{option.label}</span>
@@ -87,7 +81,7 @@ export const CreateChannelModal = ({ isOpen, onClose, onCreate }: CreateChannelM
             </label>
             <div className="relative group">
               <div className="absolute inset-0 bg-cyan-400/20 rounded-xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative flex items-center bg-[#050511] px-4 py-3 rounded-lg border border-cyan-500/30 focus-within:border-cyan-400 focus-within:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all">
+              <div className="relative flex items-center glass px-4 py-3 rounded-lg border border-cyan-500/30 focus-within:border-cyan-400 focus-within:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all">
                 <Hash size={18} className="text-cyan-500/50 shrink-0" />
                 <input
                   type="text"

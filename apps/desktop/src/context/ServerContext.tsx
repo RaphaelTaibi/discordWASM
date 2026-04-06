@@ -1,15 +1,6 @@
 import { createContext, useContext, useState, PropsWithChildren } from 'react';
 import { Server, ServerChannel } from '../models/server.model';
-
-interface ServerContextProps {
-  servers: Server[];
-  activeServerId: string | null;
-  setActiveServerId: (id: string) => void;
-  createServer: (name: string) => void;
-  joinServer: (inviteKey: string) => void;
-  createChannel: (serverId: string, channel: Omit<ServerChannel, 'id'>) => void;
-  deleteChannel: (serverId: string, channelId: string) => void;
-}
+import ServerContextProps from '../models/serverContext.model';
 
 const ServerContext = createContext<ServerContextProps | undefined>(undefined);
 
@@ -18,19 +9,20 @@ export const ServerProvider = ({ children }: PropsWithChildren) => {
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
 
   const createServer = (name: string) => {
-    // TODO: Call websocket / backend here
+    const _id = crypto.randomUUID();
     const _newServer: Server = {
-      id: crypto.randomUUID(),
+      id: _id,
       name,
       ownerPublicKey: '',
       inviteKey: '',
       channels: []
     };
     setServers(prev => [...prev, _newServer]);
+    setActiveServerId(_id);
   };
 
   const joinServer = (inviteKey: string) => {
-    // Call websocket / backend here
+    // TODO: Call websocket / backend here
     console.log("Join server", inviteKey);
   };
 

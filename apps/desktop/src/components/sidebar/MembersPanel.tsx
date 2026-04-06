@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useVoiceStore } from '../../context/VoiceContext';
 import MembersPanelProps from '../../models/membersPanelProps.model';
 import { UserContextMenu } from '../ui/UserContextMenu';
+import { identityTag } from '../../lib/identity-tag';
 
 export const MembersPanel = ({
     participants,
@@ -56,7 +57,10 @@ export const MembersPanel = ({
                                     member.username.slice(0, 1).toUpperCase()
                                 )}
                             </div>
-                            <span className="text-[13px] text-cyan-100/80 truncate flex-1 font-medium">{member.username}</span>
+                            <span className="text-[13px] text-cyan-100/80 truncate flex-1 font-medium">
+                                {member.username}
+                                <span className="text-cyan-500/40 text-[10px] ml-1 font-mono">#{identityTag(member.userId)}</span>
+                            </span>
                             <div className="inline-flex items-center gap-1">
                                 {memberDeafened && (
                                     <span className="text-[10px] uppercase font-bold text-orange-300 inline-flex items-center gap-0.5">
