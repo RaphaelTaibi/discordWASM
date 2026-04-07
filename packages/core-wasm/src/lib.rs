@@ -1,5 +1,8 @@
 use wasm_bindgen::prelude::*;
 
+pub mod proto;
+pub mod codec;
+
 // =========================
 // === AUDIO ANALYSE & FX ===
 // =========================
