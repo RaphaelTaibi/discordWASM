@@ -7,6 +7,10 @@ export interface AuthState {
     publicKey: string | null;
     avatar: string | null;
     userTag: string | null;
+    /** Server-side user id (UUID) from the auth API. */
+    serverUserId: string | null;
+    /** JWT token for authenticated API calls. */
+    token: string | null;
     isAuthenticated: boolean;
     login: (pseudo: string, password: string) => Promise<void>;
     recover: (pseudo: string, password: string) => Promise<void>;
