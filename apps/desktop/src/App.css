@@ -27,6 +27,25 @@
     50% { opacity: 0.6; }
 }
 
+@keyframes vad-bar {
+    0%, 100% { height: 3px; }
+    50% { height: 10px; }
+}
+
+/* ── VAD bar animations with staggered delays ── */
+
+@utility animate-vad-bar-1 {
+    animation: vad-bar 0.5s ease-in-out infinite;
+}
+
+@utility animate-vad-bar-2 {
+    animation: vad-bar 0.5s ease-in-out 0.15s infinite;
+}
+
+@utility animate-vad-bar-3 {
+    animation: vad-bar 0.5s ease-in-out 0.3s infinite;
+}
+
 /* ── Base ── */
 
 body {

@@ -771,7 +771,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
       "id": 20,
-      "title": "🛡️ Fraud Detection",
+      "title": "Fraud Detection",
       "type": "row"
     },
     {
@@ -897,7 +897,7 @@
           "refId": "C"
         }
       ],
-      "title": "🔑 Tentatives de Hack du Protocole (par heure)",
+      "title": "Tentatives de Hack du Protocole (par heure)",
       "type": "timeseries"
     },
     {
@@ -938,7 +938,7 @@
           "refId": "A"
         }
       ],
-      "title": "🚫 Total IPs Bannies",
+      "title": "Total IPs Bannies",
       "type": "stat"
     },
     {
@@ -978,7 +978,7 @@
           "refId": "A"
         }
       ],
-      "title": "☠️ Bans Permanents (Récidive)",
+      "title": "Bans Permanents (Récidive)",
       "type": "stat"
     },
     {
@@ -1019,7 +1019,7 @@
           "refId": "A"
         }
       ],
-      "title": "🛑 Requêtes Bloquées (Total)",
+      "title": "Requêtes Bloquées (Total)",
       "type": "stat"
     },
     {
@@ -1060,7 +1060,7 @@
           "refId": "A"
         }
       ],
-      "title": "🔑 Tentatives Invalid Token",
+      "title": "Tentatives Invalid Token",
       "type": "stat"
     },
     {
@@ -1100,7 +1100,7 @@
           "refId": "A"
         }
       ],
-      "title": "🖐️ Bans par Fingerprint",
+      "title": "Bans par Fingerprint",
       "type": "stat"
     }
   ],

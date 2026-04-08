@@ -38,7 +38,7 @@ const ChannelPanel: React.FC<ChannelPanelProps> = ({ channelName, isInVoice = fa
                     </h1>
                 </header>
 
-                <div className="flex-1 min-h-0 relative flex flex-col items-center justify-center">
+                <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
                     {children}
                 </div>
 

@@ -253,13 +253,17 @@ impl BanStore {
 }
 
 /// Spawns a background flusher for the ban store.
+/// Disk I/O runs on the blocking threadpool.
 pub fn spawn_flusher(store: BanStore) {
     tokio::spawn(async move {
         loop {
             store.dirty.notified().await;
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            if let Err(e) = store.flush() {
-                tracing::error!("Ban store flush failed: {e}");
+            let store_ref = store.clone();
+            match tokio::task::spawn_blocking(move || store_ref.flush()).await {
+                Ok(Err(e)) => tracing::error!("Ban store flush failed: {e}"),
+                Err(e) => tracing::error!("Ban store flush task panicked: {e}"),
+                _ => {}
             }
         }
     });

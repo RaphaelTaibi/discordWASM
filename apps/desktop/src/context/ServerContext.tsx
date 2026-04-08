@@ -10,9 +10,13 @@ export const ServerProvider = ({ children }: PropsWithChildren) => {
   const [servers, setServers] = useState<Server[]>([]);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { publicKey } = useAuth();
+  const { publicKey, token } = useAuth();
 
   const fetchServers = useCallback(async () => {
+    if (!token) {
+      setServers([]);
+      return;
+    }
     setLoading(true);
     try {
       const _list = await serverApi.listServers();
@@ -22,9 +26,15 @@ export const ServerProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
+  // Re-fetch whenever the auth token changes (login / logout / session restore)
   useEffect(() => { fetchServers(); }, [fetchServers]);
+
+  // Reset selection on logout
+  useEffect(() => {
+    if (!token) setActiveServerId(null);
+  }, [token]);
 
   const createServer = useCallback(async (name: string) => {
     if (!publicKey) return;

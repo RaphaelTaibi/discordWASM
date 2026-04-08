@@ -7,9 +7,10 @@ import ServerSettingsModalProps from '../../models/serverSettingsModalProps.mode
  * Modal displaying server settings.
  * Reveals the invite key and allows channel management (delete with confirmation).
  */
-export const ServerSettingsModal = ({ isOpen, onClose, server, onDeleteChannel }: ServerSettingsModalProps) => {
+export const ServerSettingsModal = ({ isOpen, onClose, server, onDeleteChannel, onDeleteServer }: ServerSettingsModalProps) => {
   const [copied, setCopied] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDeleteServer, setPendingDeleteServer] = useState(false);
 
   const handleCopy = async () => {
     if (!server.inviteKey) return;
@@ -144,6 +145,46 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onDeleteChannel }
             {server.members.length} membre{server.members.length > 1 ? 's' : ''}
           </p>
         </div>
+
+        {/* Danger zone — delete server */}
+        {onDeleteServer && (
+          <div className="border-t border-red-500/20 pt-5">
+            <label className="block text-[11px] font-black text-red-400/70 uppercase tracking-widest mb-3">
+              Zone de danger
+            </label>
+            {!pendingDeleteServer ? (
+              <button
+                onClick={() => setPendingDeleteServer(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[13px] font-bold rounded-lg border border-red-500/30 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(248,113,113,0.3)] transition-all w-full justify-center"
+              >
+                <Trash2 size={15} />
+                Supprimer le serveur
+              </button>
+            ) : (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 animate-in fade-in duration-200">
+                <AlertTriangle size={20} className="text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-[13px] text-cyan-100 font-bold mb-1">Supprimer « {server.name} » ?</p>
+                  <p className="text-[12px] text-cyan-100/50 mb-3">Cette action est irréversible. Tous les salons et données seront perdus.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPendingDeleteServer(false)}
+                      className="px-4 py-1.5 text-[12px] font-bold text-cyan-500/70 hover:text-cyan-300 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={() => { onDeleteServer(); onClose(); }}
+                      className="px-4 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[12px] font-bold rounded-lg border border-red-500/40 hover:shadow-[0_0_15px_rgba(248,113,113,0.3)] transition-all"
+                    >
+                      Confirmer la suppression
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

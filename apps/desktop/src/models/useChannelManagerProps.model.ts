@@ -18,6 +18,7 @@ export default interface UseChannelManagerProps {
   vadThreshold: number;
   vadAuto: boolean;
   setLocalStream: Dispatch<SetStateAction<MediaStream | null>>;
+  setRawLocalStream: Dispatch<SetStateAction<MediaStream | null>>;
   setChannelId: Dispatch<SetStateAction<string | null>>;
   setParticipants: Dispatch<SetStateAction<VoicePeer[]>>;
   setChannelStartedAt: Dispatch<SetStateAction<number | undefined>>;

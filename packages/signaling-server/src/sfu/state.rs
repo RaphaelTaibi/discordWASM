@@ -2,15 +2,25 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{RwLock, mpsc};
 use webrtc::api::API;
 use webrtc::peer_connection::RTCPeerConnection;
 use webrtc::rtp::packet::Packet;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 
-use super::models::ServerRegistry;
+use super::registry::ServerRegistry;
 use crate::store::Store;
+
+// ---------------------------------------------------------------------------
+// Bounded channel capacities
+// ---------------------------------------------------------------------------
+
+/// Max queued WebSocket JSON messages per peer before dropping.
+pub const WS_CHANNEL_CAPACITY: usize = 512;
+
+/// Max queued RTP packets per forwarder before dropping.
+pub const RTP_CHANNEL_CAPACITY: usize = 500;
 
 // ---------------------------------------------------------------------------
 // SFU forwarding
@@ -24,8 +34,10 @@ pub struct ForwarderState {
     pub stream_id: String,
     pub kind: String,
     pub codec: RTCRtpCodecCapability,
-    pub destination_tracks: HashMap<String, Arc<TrackLocalStaticRTP>>,
-    pub tx: mpsc::UnboundedSender<Packet>,
+    /// Shared between the forwarding worker (reader) and track management (writer).
+    /// Fine-grained lock avoids acquiring the global channels lock on every RTP packet.
+    pub destination_tracks: Arc<RwLock<HashMap<String, Arc<TrackLocalStaticRTP>>>>,
+    pub tx: mpsc::Sender<Packet>,
 }
 
 // ---------------------------------------------------------------------------
@@ -136,8 +148,8 @@ pub struct ChannelState {
 
 /// Shared application state available to all handlers.
 pub struct AppState {
-    pub peers: Mutex<HashMap<String, PeerSession>>,
-    pub channels: Mutex<HashMap<String, ChannelState>>,
+    pub peers: RwLock<HashMap<String, PeerSession>>,
+    pub channels: RwLock<HashMap<String, ChannelState>>,
     pub server_registry: ServerRegistry,
     pub api: API,
     pub auth_store: Store,
@@ -149,9 +161,8 @@ pub struct PeerSession {
     pub user_id: String,
     pub username: String,
     pub channel_id: String,
-    pub tx: mpsc::UnboundedSender<String>,
+    pub tx: mpsc::Sender<String>,
     pub is_muted: bool,
     pub is_deafened: bool,
     pub peer_connection: Option<Arc<RTCPeerConnection>>,
 }
-

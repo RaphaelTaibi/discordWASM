@@ -12,21 +12,19 @@ import { Server } from "../models/server.model";
  */
 export function useDashboardState() {
     const { isAuthenticated, login, logout, recover, username, userId } = useAuth();
-    const { servers, activeServerId, createChannel, deleteChannel } = useServer();
+    const { servers, activeServerId, createChannel, deleteChannel, deleteServer, isOwner: checkOwner } = useServer();
     const voice = useVoiceStore();
     const updater = useTauriUpdater();
     const [activeView, setActiveView] = useState<SidebarView>("chat");
     const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    // Bridge auth identity into the voice/signaling layer
     useEffect(() => {
         if (isAuthenticated && username && userId) {
             voice.setUserInfo(username, userId);
         }
     }, [isAuthenticated, username, userId]);
 
-    // Reset selected channel when switching servers
     useEffect(() => {
         setActiveChannelId(null);
     }, [activeServerId]);
@@ -35,17 +33,7 @@ export function useDashboardState() {
         ? servers.find((s) => s.id === activeServerId)
         : undefined;
 
-    const salons = activeServer
-        ? activeServer.channels
-              .filter((c) => c.type === "voice" || c.type === "video")
-              .map((c) => ({
-                  id: c.id,
-                  name: c.name,
-                  members: voice.participants.filter(
-                      () => voice.channelId === c.id
-                  ),
-              }))
-        : [];
+    const isOwner = activeServerId ? checkOwner(activeServerId) : false;
 
     return {
         isAuthenticated,
@@ -60,12 +48,13 @@ export function useDashboardState() {
         activeView,
         setActiveView,
         voice,
-        salons,
         createChannel,
         deleteChannel,
+        deleteServer,
         isSettingsOpen,
         setIsSettingsOpen,
         updater,
+        isOwner,
     };
 }
 

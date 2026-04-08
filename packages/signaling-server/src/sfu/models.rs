@@ -1,10 +1,7 @@
-use std::sync::Arc;
-
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
-// Server / Channel registry (persistent JSON)
+// Server / Channel data types (used at runtime and in REST API)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -26,31 +23,6 @@ pub struct Server {
     pub members: Vec<String>,
 }
 
-#[derive(Clone)]
-pub struct ServerRegistry {
-    pub servers: Arc<DashMap<String, Server>>,
-}
-
-impl ServerRegistry {
-    pub fn new() -> Self {
-        let servers = Arc::new(DashMap::new());
-        if let Ok(contents) = std::fs::read_to_string("servers.json") {
-            if let Ok(loaded) = serde_json::from_str::<Vec<Server>>(&contents) {
-                for s in loaded {
-                    servers.insert(s.id.clone(), s);
-                }
-            }
-        }
-        Self { servers }
-    }
-
-    pub fn save(&self) {
-        let vec: Vec<Server> = self.servers.iter().map(|kv| kv.value().clone()).collect();
-        if let Ok(json) = serde_json::to_string_pretty(&vec) {
-            let _ = std::fs::write("servers.json", json);
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // WebSocket protocol — Client → Server

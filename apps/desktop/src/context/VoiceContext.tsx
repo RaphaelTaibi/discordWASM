@@ -30,6 +30,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
     const [remoteVideoStreams, setRemoteVideoStreams] = useState<Map<string, MediaStream>>(new Map());
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [rawLocalStream, setRawLocalStream] = useState<MediaStream | null>(null);
     const [userVolumes, setUserVolumes] = useState<Map<string, number>>(new Map());
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [bandwidthStats, setBandwidthStats] = useState<Map<string, number>>(new Map());
@@ -79,7 +80,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         usernameRef, fingerprintRef, rawMicVolumeRef: settings.rawMicVolumeRef,
         remoteStreams, smartGateEnabled: settings.smartGateEnabled,
         vadThreshold: settings.vadThreshold, vadAuto: settings.vadAuto,
-        setLocalStream, setChannelId, setParticipants,
+        setLocalStream, setRawLocalStream, setChannelId, setParticipants,
         setChannelStartedAt, setRemoteStreams, setRemoteVideoStreams, setError,
     });
 
@@ -178,7 +179,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     // ── Context value ────────────────────────────────────────────────
     const value = useMemo(() => ({
         channelId, participants, isConnected, isMuted, isDeafened, error,
-        localUserId: userIdRef.current, localStream, channelStartedAt, bandwidthStats,
+        localUserId: userIdRef.current, localStream, rawLocalStream, channelStartedAt, bandwidthStats,
         joinChannel, leaveChannel, toggleMute, toggleDeafen,
         remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack,
         userVolumes, setUserVolume: (id: string, vol: number) => setUserVolumes(p => new Map(p).set(id, vol)),
@@ -187,7 +188,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
         ...settings, isPttActive,
     }), [
         channelId, participants, isConnected, isMuted, isDeafened, error,
-        localUserId, localStream, channelStartedAt, bandwidthStats,
+        localUserId, localStream, rawLocalStream, channelStartedAt, bandwidthStats,
         joinChannel, leaveChannel, toggleMute, toggleDeafen,
         remoteStreams, remoteVideoStreams, addScreenTrack, removeScreenTrack,
         userVolumes, networkQuality, ping, averagePing, packetLoss,

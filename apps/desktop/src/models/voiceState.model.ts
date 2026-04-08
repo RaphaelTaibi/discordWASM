@@ -9,6 +9,8 @@ export default interface VoiceState {
     error: string | null;
     localUserId: string;
     localStream: MediaStream | null;
+    /** Raw mic stream before noise-gate, used for VAD analysis. */
+    rawLocalStream: MediaStream | null;
     channelStartedAt?: number;
     joinChannel: (channelId: string, username: string) => void;
     leaveChannel: () => void;

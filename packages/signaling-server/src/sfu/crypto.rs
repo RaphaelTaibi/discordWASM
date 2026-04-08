@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 
 /// Maximum allowed timestamp drift (seconds) to prevent replay attacks.
 const MAX_TIMESTAMP_DRIFT_SECS: u64 = 60;

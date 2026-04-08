@@ -142,13 +142,17 @@ impl Store {
 
 /// Spawns a background task that flushes the store whenever marked dirty,
 /// with a 2-second debounce to batch rapid writes.
+/// Disk I/O runs on the blocking threadpool to avoid stalling async tasks.
 pub fn spawn_flusher(store: Store) {
     tokio::spawn(async move {
         loop {
             store.dirty.notified().await;
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            if let Err(e) = store.flush() {
-                tracing::error!("Flush failed: {e}");
+            let store_ref = store.clone();
+            match tokio::task::spawn_blocking(move || store_ref.flush()).await {
+                Ok(Err(e)) => tracing::error!("Flush failed: {e}"),
+                Err(e) => tracing::error!("Flush task panicked: {e}"),
+                _ => {}
             }
         }
     });

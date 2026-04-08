@@ -11,7 +11,7 @@ export function useChannelManager({
     screenStreamRef, noiseGateNodeRef, channelIdRef, userIdRef,
     usernameRef, fingerprintRef, rawMicVolumeRef, remoteStreams,
     smartGateEnabled, vadThreshold, vadAuto,
-    setLocalStream, setChannelId, setParticipants,
+    setLocalStream, setRawLocalStream, setChannelId, setParticipants,
     setChannelStartedAt, setRemoteStreams, setRemoteVideoStreams, setError,
 }: UseChannelManagerProps) {
 
@@ -69,6 +69,7 @@ export function useChannelManager({
             localAudioCtxRef.current = audioCtx;
             localStreamRef.current = _gateStream;
             setLocalStream(_gateStream);
+            setRawLocalStream(_rawStream);
             channelIdRef.current = nextChannelId;
             setChannelId(nextChannelId);
             sendSignal({
@@ -76,7 +77,7 @@ export function useChannelManager({
                 ...(fingerprintRef.current ? { fingerprint: fingerprintRef.current } : {}),
             });
         } catch { setError("Microphone inaccessible"); }
-    }, [sendSignal, smartGateEnabled, vadThreshold, vadAuto, channelIdRef, userIdRef, fingerprintRef, noiseGateNodeRef, rawMicVolumeRef, localStreamRef, localAudioCtxRef, setLocalStream, setChannelId, setError]);
+    }, [sendSignal, smartGateEnabled, vadThreshold, vadAuto, channelIdRef, userIdRef, fingerprintRef, noiseGateNodeRef, rawMicVolumeRef, localStreamRef, localAudioCtxRef, setLocalStream, setRawLocalStream, setChannelId, setError]);
 
     const leaveChannel = useCallback(() => {
         if (channelIdRef.current) {
@@ -92,6 +93,7 @@ export function useChannelManager({
         if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
         setLocalStream(null);
+        setRawLocalStream(null);
         if (screenStreamRef.current) screenStreamRef.current.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
         setChannelId(null);
@@ -101,7 +103,7 @@ export function useChannelManager({
         remoteStreams.forEach(stream => stream.getTracks().forEach(t => t.stop()));
         setRemoteStreams(new Map());
         setRemoteVideoStreams(new Map());
-    }, [sendSignal, sfuConnectionRef, localStreamRef, localAudioCtxRef, screenStreamRef, noiseGateNodeRef, channelIdRef, userIdRef, usernameRef, fingerprintRef, remoteStreams, setLocalStream, setChannelId, setParticipants, setChannelStartedAt, setRemoteStreams, setRemoteVideoStreams]);
+    }, [sendSignal, sfuConnectionRef, localStreamRef, localAudioCtxRef, screenStreamRef, noiseGateNodeRef, channelIdRef, userIdRef, usernameRef, fingerprintRef, remoteStreams, setLocalStream, setRawLocalStream, setChannelId, setParticipants, setChannelStartedAt, setRemoteStreams, setRemoteVideoStreams]);
 
     return { joinChannel, leaveChannel };
 }

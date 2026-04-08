@@ -3,6 +3,7 @@ import { ChevronDown, Plus, Settings, Hash } from 'lucide-react';
 import { ServerChannel } from '../../models/server.model';
 import { ChannelItem } from './ChannelItem';
 import { CreateChannelModal } from './CreateChannelModal';
+import { VoiceParticipantCard } from './VoiceParticipantCard';
 import { ServerSettingsModal } from '../ui/ServerSettingsModal';
 import ChannelListProps from '../../models/channelListProps.model';
 
@@ -16,6 +17,7 @@ export const ChannelList = ({
   onSelectChannel,
   onCreateChannel,
   onDeleteChannel,
+  onDeleteServer,
   onJoinVoice,
   isOwner = false,
   participants = [],
@@ -81,18 +83,17 @@ export const ChannelList = ({
                 />
                 {/* Participants in active voice channel */}
                 {voiceChannelId === channel.id && (channel.type === 'voice' || channel.type === 'video') && participants.length > 0 && (
-                  <div className="ml-8 pl-3 border-l-2 border-cyan-500/20 my-1 py-1 flex flex-col gap-1.5 transition-all duration-300">
-                    {participants.map(p => {
-                      const _isSpeaking = speakingUsers.get(p.userId) ?? false;
-                      return (
-                        <div key={p.userId} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-cyan-100/70 hover:bg-[#0a0b14] hover:text-cyan-100 border border-transparent hover:border-cyan-500/30 transition-all duration-300 cursor-pointer">
-                          <div className={`w-8 h-8 rounded-full bg-[#050511] flex items-center justify-center text-[12px] font-black border border-cyan-500/30 transition-all duration-300 ${_isSpeaking ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#050511] shadow-[0_0_20px_rgba(34,211,238,0.5)] text-cyan-200' : 'text-cyan-100/60'}`}>
-                            {p.username.slice(0, 1).toUpperCase()}
-                          </div>
-                          <span className="text-[13px] font-bold tracking-wide truncate">{p.username}</span>
-                        </div>
-                      );
-                    })}
+                  <div className="ml-8 pl-3 border-l-2 border-cyan-500/20 my-1 py-1 flex flex-col gap-0.5 transition-all duration-300">
+                    {participants.map(p => (
+                      <VoiceParticipantCard
+                        key={p.userId}
+                        username={p.username}
+                        userId={p.userId}
+                        isMuted={p.isMuted}
+                        isDeafened={p.isDeafened}
+                        isSpeaking={speakingUsers.get(p.userId) ?? false}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -153,6 +154,7 @@ export const ChannelList = ({
           onClose={() => setIsSettingsOpen(false)}
           server={server}
           onDeleteChannel={onDeleteChannel}
+          onDeleteServer={onDeleteServer}
         />
       )}
     </div>

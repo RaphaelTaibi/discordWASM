@@ -90,3 +90,31 @@ groups:
         annotations:
           summary: "Fingerprint abuse detected"
           description: "{{ $value }} IP(s) banned in the last hour — same device fingerprint across multiple IPs"
+
+      - alert: HighWsQueueDrops
+        expr: rate(sfu_ws_queue_dropped_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket messages being dropped"
+          description: "{{ $value }} WS messages/s dropped — peer connections may be overloaded"
+
+      - alert: HighRtpPacketDrops
+        expr: rate(sfu_rtp_packets_dropped_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RTP packets being dropped at high rate"
+          description: "{{ $value }} RTP packets/s dropped — audio quality severely degraded"
+
+      - alert: HighDestinationTracks
+        expr: sfu_destination_tracks > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High O(N²) forwarding load"
+          description: "{{ $value }} destination tracks active — quadratic scaling may cause issues"
+

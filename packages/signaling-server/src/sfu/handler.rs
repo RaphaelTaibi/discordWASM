@@ -12,8 +12,9 @@ use tokio::sync::mpsc;
 use super::broadcast::{broadcast_to_channel, remove_peer, serialize_message};
 use super::models::{ClientMessage, PeerInfo, ServerMessage};
 use super::negotiation;
-use super::state::{AppState, ChannelState, PeerSession, RTCPStats};
+use super::state::{AppState, ChannelState, PeerSession, RTCPStats, WS_CHANNEL_CAPACITY};
 use crate::fraud::FraudState;
+use crate::metrics::WS_QUEUE_DROPPED;
 
 /// Axum WebSocket upgrade handler.
 pub async fn ws_handler(
@@ -35,7 +36,7 @@ async fn handle_socket(
     fraud_state: Option<FraudState>,
 ) {
     let (mut socket_sender, mut socket_receiver) = socket.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::channel::<String>(WS_CHANNEL_CAPACITY);
     let mut current_user_id: Option<String> = None;
 
     let send_task = tokio::spawn(async move {
@@ -91,7 +92,7 @@ async fn handle_socket(
                 is_deafened,
             } => {
                 let uid_for_exclude = user_id.clone();
-                if let Some(peer) = state.peers.lock().await.get_mut(&user_id) {
+                if let Some(peer) = state.peers.write().await.get_mut(&user_id) {
                     peer.is_muted = is_muted;
                     peer.is_deafened = is_deafened;
                 }
@@ -148,7 +149,7 @@ async fn handle_socket(
 /// Processes a Join message: registers the peer, notifies the channel.
 async fn handle_join(
     state: &Arc<AppState>,
-    tx: &mpsc::UnboundedSender<String>,
+    tx: &mpsc::Sender<String>,
     current_user_id: &mut Option<String>,
     channel_id: String,
     user_id: String,
@@ -159,7 +160,7 @@ async fn handle_join(
     }
 
     let (existing_peers, started_at) = {
-        let mut channels = state.channels.lock().await;
+        let mut channels = state.channels.write().await;
         let channel = channels
             .entry(channel_id.clone())
             .or_insert_with(|| ChannelState {
@@ -171,7 +172,7 @@ async fn handle_join(
                     .unwrap()
                     .as_millis() as u64,
             });
-        let peers = state.peers.lock().await;
+        let peers = state.peers.read().await;
         let existing = channel
             .members
             .iter()
@@ -187,7 +188,7 @@ async fn handle_join(
         (existing, channel.started_at)
     };
 
-    state.peers.lock().await.insert(
+    state.peers.write().await.insert(
         user_id.clone(),
         PeerSession {
             user_id: user_id.clone(),
@@ -201,21 +202,22 @@ async fn handle_join(
     );
 
     {
-        let mut channels = state.channels.lock().await;
+        let mut channels = state.channels.write().await;
         if let Some(channel) = channels.get_mut(&channel_id) {
             channel.members.insert(user_id.clone());
             channel.stats.insert(user_id.clone(), RTCPStats::new());
         }
     }
 
-    let _ = tx.send(
-        serialize_message(&ServerMessage::Joined {
-            channel_id: channel_id.clone(),
-            peers: existing_peers,
-            started_at,
-        })
-        .unwrap(),
-    );
+    if let Some(payload) = serialize_message(&ServerMessage::Joined {
+        channel_id: channel_id.clone(),
+        peers: existing_peers,
+        started_at,
+    }) {
+        if tx.try_send(payload).is_err() {
+            WS_QUEUE_DROPPED.inc();
+        }
+    }
 
     broadcast_to_channel(
         state,
@@ -235,4 +237,3 @@ async fn handle_join(
 
     *current_user_id = Some(user_id);
 }
-

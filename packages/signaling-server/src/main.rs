@@ -16,7 +16,7 @@ use std::sync::Arc;
 use axum::{Extension, Router, routing::get};
 use axum_server::tls_rustls::RustlsConfig;
 use rustls::crypto::aws_lc_rs;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use webrtc::api::APIBuilder;
 use webrtc::api::interceptor_registry::register_default_interceptors;
@@ -26,7 +26,7 @@ use webrtc::ice::udp_network::{EphemeralUDP, UDPNetwork};
 use webrtc::interceptor::registry::Registry as InterceptorRegistry;
 
 use sfu::handler::ws_handler;
-use sfu::models::ServerRegistry;
+use sfu::registry::ServerRegistry;
 use sfu::state::AppState;
 
 #[tokio::main]
@@ -45,15 +45,19 @@ async fn main() {
     }
 
     tracing_subscriber::fmt::init();
+    metrics::init_uptime();
 
     let api = build_webrtc_api();
     let auth_store = store::Store::load("auth_store.bin");
     store::spawn_flusher(auth_store.clone());
 
+    let server_registry = ServerRegistry::load("servers.bin");
+    sfu::registry::spawn_flusher(server_registry.clone());
+
     let app_state = Arc::new(AppState {
-        peers: Mutex::new(HashMap::new()),
-        channels: Mutex::new(HashMap::new()),
-        server_registry: ServerRegistry::new(),
+        peers: RwLock::new(HashMap::new()),
+        channels: RwLock::new(HashMap::new()),
+        server_registry,
         api,
         auth_store: auth_store.clone(),
     });
@@ -67,6 +71,18 @@ async fn main() {
 
     let fraud_detector = Arc::new(fraud::detector::FraudDetector::new());
     fraud::detector::spawn_cleanup(Arc::clone(&fraud_detector));
+
+    // Periodic active-bans gauge refresh
+    {
+        let ban_ref = ban_store.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+            loop {
+                interval.tick().await;
+                metrics::ACTIVE_BANS.set(ban_ref.entries.len() as i64);
+            }
+        });
+    }
 
     let fraud_state = fraud::FraudState {
         bans: ban_store,
@@ -107,7 +123,7 @@ async fn main() {
         .expect("Failed to find cert.pem or key.pem");
 
         println!(
-            "🚀 PROD MODE: SFU Server running on https://{} | UDP Range: 10000-20000",
+            "PROD MODE: SFU Server running on https://{} | UDP Range: 10000-20000",
             addr
         );
         axum_server::bind_rustls(addr, tls_config)
