@@ -159,10 +159,22 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
     const sendChatMessage = useCallback((message: string) => {
         if (!message.trim()) return;
+        const _timestamp = Date.now();
+        const _id = `${userIdRef.current}-${_timestamp}`;
+
+        // Optimistic local display — server echo is deduped by matching ID
+        setChatMessages(prev => [...prev, {
+            id: _id,
+            from: userIdRef.current,
+            username: usernameRef.current,
+            message: message.trim(),
+            timestamp: _timestamp,
+        }]);
+
         sendSignal({
             type: 'chat', channelId: 'global-chat',
             from: userIdRef.current, username: usernameRef.current,
-            message, timestamp: Date.now(),
+            message: message.trim(), timestamp: _timestamp,
         });
     }, [sendSignal]);
 

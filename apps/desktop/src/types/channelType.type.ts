@@ -1,2 +1,2 @@
-export type ChannelType = 'text' | 'voice' | 'video';
+export type ChannelType = 'text' | 'voice';
 

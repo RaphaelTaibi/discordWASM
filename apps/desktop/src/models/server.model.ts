@@ -1,7 +1,7 @@
 export interface ServerChannel {
   id: string;
   name: string;
-  type: 'text' | 'voice' | 'video';
+  type: 'text' | 'voice';
 }
 
 export interface Server {

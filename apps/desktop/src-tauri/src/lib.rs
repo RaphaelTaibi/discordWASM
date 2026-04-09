@@ -145,11 +145,11 @@ fn load_layout_from_disk(app: &tauri::AppHandle) -> Option<HashMap<String, Layou
 /// Provides sensible default panel positions as fractions of the container.
 fn default_layout() -> HashMap<String, LayoutWindow> {
     let mut map = HashMap::new();
-    map.insert("sidebar".into(), LayoutWindow { id: "sidebar".into(), x: 0.0, y: 0.116, w: 0.156, h: 0.884, z: 20 });
-    map.insert("channel-panel".into(), LayoutWindow { id: "channel-panel".into(), x: 0.156, y: 0.121, w: 0.642, h: 0.879, z: 10 });
-    map.insert("chat-panel".into(), LayoutWindow { id: "chat-panel".into(), x: 0.797, y: 0.117, w: 0.203, h: 0.883, z: 30 });
-    map.insert("friends-bar".into(), LayoutWindow { id: "friends-bar".into(), x: 0.414, y: 0.005, w: 0.219, h: 0.048, z: 25 });
-    map.insert("server-bar".into(), LayoutWindow { id: "server-bar".into(), x: 0.001, y: 0.0, w: 0.113, h: 0.07, z: 0 });
+    map.insert("sidebar".into(), LayoutWindow { id: "sidebar".into(), x: 0.0, y: 0.1161, w: 0.1559, h: 0.8839, z: 20 });
+    map.insert("channel-panel".into(), LayoutWindow { id: "channel-panel".into(), x: 0.156, y: 0.1212, w: 0.6419, h: 0.8788, z: 10 });
+    map.insert("chat-panel".into(), LayoutWindow { id: "chat-panel".into(), x: 0.7967, y: 0.117, w: 0.2033, h: 0.883, z: 30 });
+    map.insert("friends-bar".into(), LayoutWindow { id: "friends-bar".into(), x: 0.4138, y: 0.005, w: 0.2188, h: 0.048, z: 25 });
+    map.insert("server-bar".into(), LayoutWindow { id: "server-bar".into(), x: 0.0005, y: 0.0, w: 0.1133, h: 0.0698, z: 0 });
     map
 }
 

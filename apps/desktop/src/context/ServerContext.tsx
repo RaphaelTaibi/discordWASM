@@ -62,8 +62,12 @@ export const ServerProvider = ({ children }: PropsWithChildren) => {
 
   const createChannel = useCallback(async (serverId: string, channel: Omit<ServerChannel, 'id'>) => {
     if (!publicKey) return;
-    const _updated = await serverApi.createChannel(serverId, channel.name, channel.type, publicKey);
-    setServers(prev => prev.map(s => s.id === serverId ? _updated : s));
+    try {
+      const _updated = await serverApi.createChannel(serverId, channel.name, channel.type, publicKey);
+      setServers(prev => prev.map(s => s.id === serverId ? _updated : s));
+    } catch (err) {
+      console.error('Failed to create channel:', err);
+    }
   }, [publicKey]);
 
   const deleteChannel = useCallback(async (serverId: string, channelId: string) => {

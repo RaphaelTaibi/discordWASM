@@ -4,11 +4,11 @@ import { listen, emit } from "@tauri-apps/api/event";
 
 /** Default layout positions as fractions (0.0–1.0). */
 const DEFAULTS: Record<string, { x: number; y: number; w: number; h: number }> = {
-  sidebar: { x: 0.0, y: 0.116, w: 0.156, h: 0.884 },
-  "channel-panel": { x: 0.156, y: 0.121, w: 0.642, h: 0.879 },
-  "chat-panel": { x: 0.797, y: 0.117, w: 0.203, h: 0.883 },
-  "friends-bar": { x: 0.414, y: 0.005, w: 0.219, h: 0.048 },
-  "server-bar": { x: 0.001, y: 0.0, w: 0.113, h: 0.07 },
+  sidebar:         { x: 0.0,    y: 0.1161, w: 0.1559, h: 0.8839 },
+  "channel-panel": { x: 0.156,  y: 0.1212, w: 0.6419, h: 0.8788 },
+  "chat-panel":    { x: 0.7967, y: 0.117,  w: 0.2033, h: 0.883  },
+  "friends-bar":   { x: 0.4138, y: 0.005,  w: 0.2188, h: 0.048  },
+  "server-bar":    { x: 0.0005, y: 0.0,    w: 0.1133, h: 0.0698 },
 };
 
 /** Returns current bento container dimensions from the DOM. */

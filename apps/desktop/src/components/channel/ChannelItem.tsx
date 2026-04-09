@@ -1,4 +1,4 @@
-import { Hash, Volume2, Video } from 'lucide-react';
+import { Hash, Volume2 } from 'lucide-react';
 import ChannelItemProps from '../../models/channelItemProps.model';
 
 /**
@@ -10,7 +10,6 @@ export const ChannelItem = ({ channel, isActive, onSelect }: ChannelItemProps) =
     const cls = `shrink-0 transition-colors ${isActive ? 'text-cyan-400' : 'text-cyan-500/50 group-hover:text-cyan-300'}`;
     switch (channel.type) {
       case 'voice': return <Volume2 size={16} className={cls} />;
-      case 'video': return <Video size={16} className={cls} />;
       default:      return <Hash size={16} className={cls} />;
     }
   };

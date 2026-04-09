@@ -29,7 +29,7 @@ export const ChannelList = ({
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const textChannels = server.channels.filter(c => c.type === 'text');
-  const voiceChannels = server.channels.filter(c => c.type === 'voice' || c.type === 'video');
+  const voiceChannels = server.channels.filter(c => c.type !== 'text');
 
   const toggleCategory = (category: string) => {
     setCollapsedCategories(prev => {
@@ -40,7 +40,7 @@ export const ChannelList = ({
   };
 
   const handleChannelClick = (channel: ServerChannel) => {
-    if (channel.type === 'voice' || channel.type === 'video') {
+    if (channel.type !== 'text') {
       onJoinVoice?.(channel.id);
     }
     onSelectChannel(channel.id);
@@ -82,7 +82,7 @@ export const ChannelList = ({
                   onSelect={() => handleChannelClick(channel)}
                 />
                 {/* Participants in active voice channel */}
-                {voiceChannelId === channel.id && (channel.type === 'voice' || channel.type === 'video') && participants.length > 0 && (
+                {voiceChannelId === channel.id && channel.type !== 'text' && participants.length > 0 && (
                   <div className="ml-8 pl-3 border-l-2 border-cyan-500/20 my-1 py-1 flex flex-col gap-0.5 transition-all duration-300">
                     {participants.map(p => (
                       <VoiceParticipantCard

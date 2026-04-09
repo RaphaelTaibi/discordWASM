@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Hash, Volume2, Video } from 'lucide-react';
+import { Hash, Volume2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import CreateChannelModalProps from '../../models/createChannelModalProps.model';
 import { ChannelType } from '../../types/channelType.type';
@@ -25,7 +25,6 @@ export const CreateChannelModal = ({ isOpen, onClose, onCreate }: CreateChannelM
   const typeOptions: { value: ChannelType; label: string; icon: React.ReactNode }[] = [
     { value: 'text', label: 'Texte', icon: <Hash size={20} /> },
     { value: 'voice', label: 'Vocal', icon: <Volume2 size={20} /> },
-    { value: 'video', label: 'Vidéo', icon: <Video size={20} /> },
   ];
 
   return (
