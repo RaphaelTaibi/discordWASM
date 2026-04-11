@@ -6,7 +6,7 @@ export const StreamCard = ({ stream, username, isBright, isSpeaking }: StreamCar
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [fps, setFps] = useState(0);
 
-    // Correction : dfinition de borderClass
+    // Correction : définition de borderClass
     const borderClass = isBright
         ? 'border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.4)] ring-2 ring-red-500'
         : isSpeaking 

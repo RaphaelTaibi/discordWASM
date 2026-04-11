@@ -46,21 +46,28 @@ export function useBentoLayout(windowId: string) {
   const { container_w, container_h } = useContainerSize();
 
   useEffect(() => {
-    let unlisten: any;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
 
     const setupListener = async () => {
-      unlisten = await listen("bento:layout:update", (event: any) => {
+      const _unlisten = await listen("bento:layout:update", (event: any) => {
         const data = typeof event.payload === "string"
             ? JSON.parse(event.payload)
             : event.payload;
-
         updateBatch(data);
       });
+
+      if (disposed) {
+        _unlisten();
+        return;
+      }
+      unlisten = _unlisten;
     };
 
     setupListener();
 
     return () => {
+      disposed = true;
       if (unlisten) unlisten();
     };
   }, [updateBatch]);

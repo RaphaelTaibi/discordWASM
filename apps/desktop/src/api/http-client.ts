@@ -1,15 +1,15 @@
 import { config } from '../lib/config';
 
-const TOKEN_KEY = 'auth_token';
+let _token: string | null = null;
 
-/** @returns The stored JWT or null. */
-export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+/** @returns The current JWT or null. */
+export const getToken = (): string | null => _token;
 
-/** Stores a JWT in localStorage. */
-export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY, token);
+/** Stores a JWT in memory (never persisted to Web Storage). */
+export const setToken = (token: string): void => { _token = token; };
 
-/** Removes the stored JWT. */
-export const clearToken = (): void => localStorage.removeItem(TOKEN_KEY);
+/** Clears the in-memory JWT. */
+export const clearToken = (): void => { _token = null; };
 
 /**
  * Thin wrapper around fetch that auto-attaches the JWT

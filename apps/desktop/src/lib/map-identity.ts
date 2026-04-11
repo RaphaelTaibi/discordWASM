@@ -8,7 +8,6 @@ import Identity from '../models/auth/identity.model';
  * @returns A properly-shaped Identity object.
  */
 export const mapIdentity = (raw: any): Identity => {
-    console.log('[mapIdentity] raw keys:', Object.keys(raw), 'raw:', JSON.stringify(raw));
     return {
         timestamp: raw.timestamp,
         publicKey: raw.publicKey ?? raw.public_key,
