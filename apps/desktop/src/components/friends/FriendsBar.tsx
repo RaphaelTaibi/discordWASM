@@ -84,6 +84,7 @@ const FriendsBar = ({
                                 avatar={f.avatar}
                                 displayName={f.displayName}
                                 username={f.username}
+                                publicKey={f.publicKey}
                             />
                         ))
                     )}

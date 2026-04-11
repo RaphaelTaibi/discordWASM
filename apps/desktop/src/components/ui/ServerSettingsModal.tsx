@@ -11,7 +11,6 @@ export const ServerSettingsModal = ({ isOpen, onClose, server, onDeleteChannel, 
   const [copied, setCopied] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingDeleteServer, setPendingDeleteServer] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const handleCopy = async () => {
     if (!server.inviteKey) return;
