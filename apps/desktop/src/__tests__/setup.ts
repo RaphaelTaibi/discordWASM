@@ -1,8 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
-/* ── WASM mock — replaces src/pkg/core_wasm for all test suites ── */
-vi.mock('../pkg/core_wasm', async () => import('../__mocks__/pkg/core_wasm'));
 
 /* ── Stub browser APIs missing in jsdom ── */
 
