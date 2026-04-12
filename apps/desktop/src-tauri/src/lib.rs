@@ -260,6 +260,53 @@ async fn call_signaling(client: tauri::State<'_, reqwest::Client>, url: String) 
     res.map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
 }
 
+// --- HTTP PROXY (pinned TLS) ---
+
+#[derive(Deserialize)]
+struct ProxyRequest {
+    method: String,
+    url: String,
+    headers: HashMap<String, String>,
+    #[serde(default)]
+    body: Option<Vec<u8>>,
+}
+
+#[derive(Serialize)]
+struct ProxyResponse {
+    status: u16,
+    body: Vec<u8>,
+}
+
+/// Generic HTTP proxy routing requests through the cert-pinned reqwest client.
+/// Allows the webview frontend to reach the self-signed signaling server.
+#[tauri::command]
+async fn http_fetch(
+    client: tauri::State<'_, reqwest::Client>,
+    request: ProxyRequest,
+) -> Result<ProxyResponse, String> {
+    let method: reqwest::Method = request.method.parse()
+        .map_err(|_| format!("Invalid HTTP method: {}", request.method))?;
+
+    let mut builder = if request.url.starts_with("http://") {
+        reqwest::Client::new().request(method, &request.url)
+    } else {
+        client.request(method, &request.url)
+    };
+
+    for (k, v) in &request.headers {
+        builder = builder.header(k.as_str(), v.as_str());
+    }
+    if let Some(body) = request.body {
+        builder = builder.body(body);
+    }
+
+    let res = builder.send().await.map_err(|e| e.to_string())?;
+    let status = res.status().as_u16();
+    let body = res.bytes().await.map_err(|e| e.to_string())?;
+
+    Ok(ProxyResponse { status, body: body.to_vec() })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
@@ -284,6 +331,7 @@ pub fn run() {
         .manage(LayoutState::default())
         .invoke_handler(tauri::generate_handler![
             call_signaling,
+            http_fetch,
             get_dsp_token,
             identity::create_identity,
             identity::find_identity_by_pubkey,

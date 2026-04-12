@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { config } from '../lib/config';
 
 let _token: string | null = null;
@@ -12,8 +13,31 @@ export const setToken = (token: string): void => { _token = token; };
 export const clearToken = (): void => { _token = null; };
 
 /**
- * Thin wrapper around fetch that auto-attaches the JWT
- * and targets the signaling server API base URL.
+ * Routes an HTTP request through Tauri's cert-pinned reqwest client.
+ * Bypasses the webview fetch which rejects self-signed certificates.
+ */
+async function nativeFetch(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    body?: Uint8Array | string,
+): Promise<{ status: number; body: Uint8Array }> {
+    let _bodyBytes: number[] | undefined;
+    if (body instanceof Uint8Array) {
+        _bodyBytes = Array.from(body);
+    } else if (typeof body === 'string') {
+        _bodyBytes = Array.from(new TextEncoder().encode(body));
+    }
+
+    const res = await invoke<{ status: number; body: number[] }>('http_fetch', {
+        request: { method, url, headers, body: _bodyBytes },
+    });
+
+    return { status: res.status, body: new Uint8Array(res.body) };
+}
+
+/**
+ * JSON API call routed through the native TLS client.
  * @param path - Relative path (e.g. `/api/auth/login`).
  * @param options - Standard RequestInit overrides.
  * @returns Parsed JSON response.
@@ -29,19 +53,22 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${config.apiUrl}${path}`, { ...options, headers });
+    const _body = typeof options.body === 'string' ? options.body : undefined;
+    const res = await nativeFetch(`${config.apiUrl}${path}`, options.method ?? 'GET', headers, _body);
 
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
+    if (res.status < 200 || res.status >= 300) {
+        const _text = new TextDecoder().decode(res.body);
+        let _msg: string;
+        try { _msg = JSON.parse(_text).error ?? `HTTP ${res.status}`; }
+        catch { _msg = `HTTP ${res.status}`; }
+        throw new Error(_msg);
     }
-    return res.json();
+
+    return JSON.parse(new TextDecoder().decode(res.body));
 }
 
 /**
- * Binary fetch for protobuf content negotiation.
- * Sends `application/x-protobuf` when a body is present and
- * requests the same format via the Accept header.
+ * Binary fetch for protobuf content negotiation, routed through native TLS.
  * @param path - Relative API path.
  * @param options - Standard RequestInit; `body` should be a Uint8Array.
  * @returns Raw response bytes for WASM protobuf decoding.
@@ -62,13 +89,17 @@ export async function apiFetchProto(
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${config.apiUrl}${path}`, { ...options, headers });
+    const _body = options.body instanceof Uint8Array ? options.body : undefined;
+    const res = await nativeFetch(`${config.apiUrl}${path}`, options.method ?? 'GET', headers, _body);
 
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
+    if (res.status < 200 || res.status >= 300) {
+        const _text = new TextDecoder().decode(res.body);
+        let _msg: string;
+        try { _msg = JSON.parse(_text).error ?? `HTTP ${res.status}`; }
+        catch { _msg = `HTTP ${res.status}`; }
+        throw new Error(_msg);
     }
-    const buf = await res.arrayBuffer();
-    return new Uint8Array(buf);
+
+    return res.body;
 }
 
