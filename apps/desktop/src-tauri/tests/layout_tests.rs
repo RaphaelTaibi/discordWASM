@@ -1,7 +1,7 @@
 /// Layout engine pure-logic tests.
 /// Validates clamping, fraction-based moves, resizes, and default layout.
 
-use desktop_lib::*;
+use desktop_lib::layout::*;
 
 // ───────────────────────── LayoutWindow ──────────────────────
 
