@@ -325,7 +325,7 @@ pub fn run() {
         .with_no_client_auth());
 
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
+        .use_preconfigured_tls(crypto.clone())
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .expect("Failed to build reqwest client");
