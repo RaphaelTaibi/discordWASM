@@ -22,6 +22,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use rustls::crypto::aws_lc_rs;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use webrtc::api::APIBuilder;
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::MediaEngine;
@@ -114,7 +115,8 @@ async fn main() {
         .nest("/api/friends", friends::router().with_state(auth_store))
         .layer(Extension(fraud_state))
         .layer(Extension(nonce_store))
-        .layer(CorsLayer::permissive());
+        .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http());
 
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
 
