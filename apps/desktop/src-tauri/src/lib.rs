@@ -300,7 +300,16 @@ async fn http_fetch(
         builder = builder.body(body);
     }
 
-    let res = builder.send().await.map_err(|e| e.to_string())?;
+    let res = builder.send().await.map_err(|e| {
+        let mut msg = e.to_string();
+        let mut src: &dyn std::error::Error = &e;
+        while let Some(cause) = src.source() {
+            msg.push_str(" → ");
+            msg.push_str(&cause.to_string());
+            src = cause;
+        }
+        msg
+    })?;
     let status = res.status().as_u16();
     let body = res.bytes().await.map_err(|e| e.to_string())?;
 
@@ -316,7 +325,8 @@ pub fn run() {
         .with_no_client_auth());
 
     let client = reqwest::Client::builder()
-        .use_preconfigured_tls((*crypto).clone())
+        .danger_accept_invalid_certs(true)
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .expect("Failed to build reqwest client");
 
