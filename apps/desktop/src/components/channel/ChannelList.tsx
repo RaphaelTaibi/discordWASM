@@ -114,7 +114,7 @@ export const ChannelList = ({
   const _memberCount = resolvedMembers.length || server.members.length;
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
+    <div className="flex flex-col h-full bg-[#050511]/60">
       {/* Server header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-cyan-500/10 shadow-[0_4px_15px_rgba(0,0,0,0.3)] shrink-0 cursor-pointer hover:bg-cyan-500/5 transition-colors group">
         <span className="font-black text-[15px] uppercase tracking-wider text-cyan-50 truncate filter drop-shadow-[0_0_8px_rgba(34,211,238,0.4)] group-hover:text-cyan-200">{server.name}</span>

@@ -18,7 +18,7 @@ const ChannelPanel: React.FC<ChannelPanelProps> = ({ channelName, isInVoice = fa
 
     return (
         <div
-            className="absolute z-10 rounded-2xl overflow-hidden border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+            className="absolute z-10 glass-heavy rounded-2xl overflow-hidden border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
             style={{ left: x, top: y, width: w, height: h, overflow: "visible" }}
         >
             <main className="flex flex-col h-full min-w-0 relative">

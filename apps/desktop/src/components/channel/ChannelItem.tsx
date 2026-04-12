@@ -19,7 +19,7 @@ export const ChannelItem = ({ channel, isActive, onSelect }: ChannelItemProps) =
       className={`group relative flex items-center gap-2.5 px-3 py-2 mx-2 mb-0.5 rounded-lg cursor-pointer transition-all duration-300 overflow-hidden
         ${isActive
           ? 'bg-cyan-500/10 text-cyan-100 shadow-[0_0_15px_rgba(34,211,238,0.15)] border border-cyan-500/30 font-bold'
-          : 'bg-transparent text-cyan-100/60 border border-transparent hover:bg-[#050511] font-medium hover:text-cyan-100 hover:border-cyan-500/20 hover:shadow-[0_0_10px_rgba(34,211,238,0.05)]'
+          : 'bg-white/3 text-cyan-100/60 border border-transparent hover:bg-[#050511] font-medium hover:text-cyan-100 hover:border-cyan-500/20 hover:shadow-[0_0_10px_rgba(34,211,238,0.05)]'
         }`}
       onClick={() => onSelect(channel.id)}
     >

@@ -42,7 +42,7 @@ export const VoiceTile = ({
     return (
         <div
             onClick={_hasStream ? onClick : undefined}
-            className={`relative rounded-xl overflow-hidden transition-all duration-300 group ${_speakingRing} ${isSpotlighted ? 'col-span-full' : ''} ${_hasVideo ? 'bg-[#050511] border border-cyan-500/20' : 'glass-heavy border-cyan-500/20'} ${_cursorClass} ${_hasStream ? 'hover:border-cyan-500/40' : ''}`}
+            className={`relative rounded-xl overflow-hidden transition-all duration-300 group ${_speakingRing} ${isSpotlighted ? 'col-span-full' : ''} ${_hasVideo ? 'bg-[#050511] border border-cyan-500/20' : 'bg-[#0a0b14]/80 backdrop-blur-xl border border-cyan-500/20'} ${_cursorClass} ${_hasStream ? 'hover:border-cyan-500/40' : ''}`}
             style={{ aspectRatio: isSpotlighted ? undefined : '16/9' }}
         >
             {/* Gradient overlay */}

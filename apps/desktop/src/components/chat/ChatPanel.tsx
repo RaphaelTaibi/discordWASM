@@ -65,7 +65,7 @@ export const ChatPanel = ({ channelName, onClose }: ChatPanelProps) => {
                 </header>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar min-h-0 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar min-h-0 flex flex-col bg-[#050511]/40">
                     <div className="mt-auto">
                         <ChatMessageList
                             messages={chatMessages}
