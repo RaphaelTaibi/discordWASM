@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::models::{PendingRequest, UserSummary};
+
 // ---------------------------------------------------------------------------
 // Server / Channel data types (used at runtime and in REST API)
 // ---------------------------------------------------------------------------
@@ -120,6 +122,42 @@ pub enum ServerMessage {
         bandwidth_bps: u64,
     },
     Error { message: String },
+
+    // -----------------------------------------------------------------------
+    // Friend social events — pushed to a single recipient via `notify_user`.
+    // -----------------------------------------------------------------------
+
+    /// Sent to the *recipient* when someone sends them a friend request.
+    #[serde(rename_all = "camelCase")]
+    FriendRequestReceived { request: PendingRequest },
+
+    /// Sent to the *original sender* when the recipient accepts.
+    #[serde(rename_all = "camelCase")]
+    FriendRequestAccepted {
+        request_id: String,
+        friend: UserSummary,
+    },
+
+    /// Sent to the *original sender* when the recipient declines.
+    #[serde(rename_all = "camelCase")]
+    FriendRequestDeclined {
+        request_id: String,
+        by_user_id: String,
+    },
+
+    /// Sent to the *recipient* when the original sender cancels a still-pending request.
+    #[serde(rename_all = "camelCase")]
+    FriendRequestCancelled {
+        request_id: String,
+        by_user_id: String,
+    },
+
+    /// Sent to the *other party* when an accepted friendship is removed.
+    #[serde(rename_all = "camelCase")]
+    FriendRemoved {
+        friendship_id: String,
+        by_user_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]

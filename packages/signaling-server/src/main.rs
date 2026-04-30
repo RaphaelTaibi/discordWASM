@@ -105,14 +105,14 @@ async fn main() {
         .route("/metrics", get(metrics::handler))
         .route("/api/auth/nonce", get(nonce::get_nonce))
         .with_state(Arc::clone(&app_state))
-        .nest("/api/servers", sfu::routes::router().with_state(app_state))
+        .nest("/api/servers", sfu::routes::router().with_state(Arc::clone(&app_state)))
         .nest(
             "/api/auth",
             auth::router()
                 .with_state(auth_store.clone())
                 .layer(Extension(server_registry_for_auth)),
         )
-        .nest("/api/friends", friends::router().with_state(auth_store))
+        .nest("/api/friends", friends::router().with_state(Arc::clone(&app_state)))
         .layer(Extension(fraud_state))
         .layer(Extension(nonce_store))
         .layer(CorsLayer::permissive())

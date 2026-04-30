@@ -2,7 +2,6 @@ import { createPortal } from 'react-dom';
 import { UserPlus, Search, Loader2 } from 'lucide-react';
 import { AddFriendPopoverProps } from '../../models/social/friendsBarProps.model';
 import { useAddFriendPopover } from '../../hooks/useAddFriendPopover';
-import { formatUserTag } from '../../lib/format-user-tag';
 
 const MIN_QUERY_LENGTH = 2;
 
@@ -13,7 +12,7 @@ const MIN_QUERY_LENGTH = 2;
 const AddFriendPopover = ({ onSend }: AddFriendPopoverProps) => {
     const {
         isOpen, query, results, loading, sent, pos,
-        btnRef, popoverRef, inputRef,
+        btnRef, popoverRef, inputRef, isInvalidFormat,
         handleToggle, handleInputChange, handleSend,
     } = useAddFriendPopover(onSend);
 
@@ -64,14 +63,21 @@ const AddFriendPopover = ({ onSend }: AddFriendPopoverProps) => {
                             </div>
                         )}
 
-                        {!loading && query.trim().length >= MIN_QUERY_LENGTH && results.length === 0 && (
+                        {!loading && isInvalidFormat && (
+                            <p className="text-center text-cyan-500/40 text-[12px] py-4 px-2 leading-relaxed">
+                                Format attendu : <span className="font-mono text-cyan-300/70">Pseudo#a1B2</span><br/>
+                                ou clé publique complète.
+                            </p>
+                        )}
+
+                        {!loading && !isInvalidFormat && query.trim().length >= MIN_QUERY_LENGTH && results.length === 0 && (
                             <p className="text-center text-cyan-500/40 text-[12px] py-4">Aucun résultat</p>
                         )}
 
                         {!loading && results.map(user => {
-                            const _tag = user.publicKey
-                                ? formatUserTag(user.displayName, user.publicKey)
-                                : user.displayName;
+                            const _suffix = user.publicKey && user.publicKey.length >= 4
+                                ? user.publicKey.slice(-4).toUpperCase()
+                                : null;
                             const _isSent = sent === user.id;
 
                             return (
@@ -83,12 +89,19 @@ const AddFriendPopover = ({ onSend }: AddFriendPopoverProps) => {
                                             <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
                                         ) : (
                                             <span className="text-cyan-200/70 text-xs font-bold">
-                                                {user.displayName.charAt(0).toUpperCase()}
+                                                {(user.displayName || user.username || '?').charAt(0).toUpperCase()}
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[13px] text-cyan-100 font-bold truncate">{_tag}</div>
+                                    <div className="flex-1 min-w-0 flex items-baseline gap-1">
+                                        <span className="text-[13px] text-cyan-100 font-bold truncate">
+                                            {user.displayName || user.username}
+                                        </span>
+                                        {_suffix && (
+                                            <span className="text-[11px] font-mono text-cyan-400/60 shrink-0">
+                                                #{_suffix}
+                                            </span>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => handleSend(user.id)}

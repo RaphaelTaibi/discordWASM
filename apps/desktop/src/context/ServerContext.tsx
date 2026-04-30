@@ -32,6 +32,23 @@ export const ServerProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => { fetchServers(); }, [fetchServers]);
 
+  // Lightweight realtime substitute: poll the server list every 10s and on
+  // window focus until the signaling server publishes dedicated WS events
+  // for `server.created` / `member.joined` / `member.left`.
+  useEffect(() => {
+    if (!token || !publicKey) return;
+    const _interval = setInterval(fetchServers, 10_000);
+    const _onFocus = () => { fetchServers(); };
+    const _onVisible = () => { if (document.visibilityState === 'visible') fetchServers(); };
+    window.addEventListener('focus', _onFocus);
+    document.addEventListener('visibilitychange', _onVisible);
+    return () => {
+      clearInterval(_interval);
+      window.removeEventListener('focus', _onFocus);
+      document.removeEventListener('visibilitychange', _onVisible);
+    };
+  }, [token, publicKey, fetchServers]);
+
   useEffect(() => {
     if (!token || !publicKey) {
       setServers([]);

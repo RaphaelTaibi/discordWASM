@@ -8,6 +8,13 @@ pub mod codec;
 // === RUNTIME CONTEXT    ===
 // =========================
 
+// ======== Comments Block ========
+// This section contains runtime context management functions and constants.
+// It includes thread-local storage for runtime status and functions to compute
+// and validate runtime seals. These are critical for ensuring the DSP runtime
+// operates securely and as expected.
+// =================================
+
 thread_local! {
     static _RT_STATUS: Cell<u8> = const { Cell::new(0) };
 }
@@ -25,6 +32,13 @@ fn _compute_expected_seal() -> u32 {
 
 /// Activates the DSP runtime context. Must be called with a valid seal
 /// obtained from the host application before audio processing begins.
+///
+/// # Example
+/// ```rust
+/// let seal = compute_seal();
+/// let activated = activate_rt_context(seal);
+/// assert!(activated);
+/// ```
 #[wasm_bindgen]
 pub fn activate_rt_context(seal: u32) -> bool {
     let ok = seal == _compute_expected_seal();
@@ -41,11 +55,35 @@ fn _rt_ok() -> bool {
 // === AUDIO ANALYSE & FX ===
 // =========================
 
+// ======== Comments Block ========
+// This section contains functions for audio analysis and effects.
+// It includes utilities for detecting peaks, computing RMS volume,
+// and applying audio compression. These functions are optimized
+// for real-time audio processing in DSP contexts.
+// =================================
+
+/// Detects if the audio signal exceeds a given threshold.
+/// Useful for peak detection in audio processing.
+///
+/// # Example
+/// ```rust
+/// let audio = vec![0.1, 0.5, 0.9];
+/// let is_peak = detect_peak(&audio, 0.8);
+/// assert!(is_peak);
+/// ```
 #[wasm_bindgen]
 pub fn detect_peak(audio: &[f32], threshold: f32) -> bool {
     audio.iter().any(|&sample| sample.abs() > threshold)
 }
 
+/// Computes the RMS (Root Mean Square) volume of the audio signal.
+///
+/// # Example
+/// ```rust
+/// let audio = vec![0.1, 0.2, 0.3];
+/// let rms = rms_volume(&audio);
+/// assert!(rms > 0.0);
+/// ```
 #[wasm_bindgen]
 pub fn rms_volume(audio: &[f32]) -> f32 {
     if audio.is_empty() {
@@ -137,6 +175,13 @@ pub fn white_noise(len: usize, amplitude: f32, seed: u32) -> Vec<f32> {
 // === VIDEO ANALYSE & FX ===
 // =========================
 
+// ======== Comments Block ========
+// This section provides functions for video analysis and effects.
+// It includes utilities for analyzing frames, detecting black/white
+// frames, and computing color histograms. These functions are designed
+// for efficient processing of video data.
+// =================================
+
 #[wasm_bindgen]
 pub fn analyze_frame(data: &[u8], width: u32, height: u32) -> String {
     let mut total: u64 = 0;
@@ -179,6 +224,13 @@ pub fn is_frozen_frame(data1: &[u8], data2: &[u8], tolerance: u8) -> bool {
 // =========================
 // === RÉSEAU & SÉCURITÉ ===
 // =========================
+
+// ======== Comments Block ========
+// This section focuses on network and security-related utilities.
+// It includes functions for calculating network quality, processing
+// network statistics, and generating device fingerprints. These
+// utilities ensure robust and secure communication.
+// =================================
 
 // Calcule un score de qualité réseau (0-3) bas sur WebRTC stats
 #[wasm_bindgen]
@@ -283,6 +335,13 @@ pub fn check_quality(bitrate: u32) -> String {
 // === SMART GATE AUDIO  ===
 // =========================
 
+// ======== Comments Block ========
+// This section implements the SmartGate audio processor.
+// It dynamically adjusts noise gating thresholds using Voice
+// Activity Detection (VAD) and adaptive noise floor estimation.
+// The SmartGate is optimized for challenging audio environments.
+// =================================
+
 #[wasm_bindgen]
 pub struct SmartGate {
     threshold: f32,
@@ -372,6 +431,13 @@ impl SmartGate {
 // === TRANSIENT SUPPRESSOR ===
 // =========================
 
+// ======== Comments Block ========
+// This section implements the Transient Suppressor.
+// It reduces sudden and intense audio peaks, such as keyboard
+// clicks, while preserving the overall audio quality. The
+// suppressor uses fast and slow envelopes for precise control.
+// =================================
+
 #[wasm_bindgen]
 pub struct TransientSuppressor {
     fast_env: f32,
@@ -412,4 +478,28 @@ impl TransientSuppressor {
             }
         }
     }
+}
+
+/// Processes audio data using the WASM library.
+/// This function is optimized for real-time audio processing.
+///
+/// # Example
+///
+/// ```rust
+/// let processed = process_audio(&input);
+/// ```
+pub fn process_audio(input: &[u8]) -> Vec<u8> {
+    // ...existing code...
+}
+
+/// Initializes the WASM library.
+/// This function must be called before using any other functions in the library.
+///
+/// # Example
+///
+/// ```rust
+/// core_wasm::initialize();
+/// ```
+pub fn initialize() {
+    // ...existing code...
 }

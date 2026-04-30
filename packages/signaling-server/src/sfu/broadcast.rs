@@ -9,6 +9,21 @@ pub fn serialize_message(message: &ServerMessage) -> Option<String> {
     serde_json::to_string(message).ok()
 }
 
+/// Pushes a server message to a single user (by id) if currently connected.
+/// No-op when the user is offline; drops are accounted for in `WS_QUEUE_DROPPED`.
+pub async fn notify_user(state: &Arc<AppState>, user_id: &str, message: &ServerMessage) {
+    let payload = match serialize_message(message) {
+        Some(p) => p,
+        None => return,
+    };
+    let peers = state.peers.read().await;
+    if let Some(peer) = peers.get(user_id) {
+        if peer.tx.try_send(payload).is_err() {
+            WS_QUEUE_DROPPED.inc();
+        }
+    }
+}
+
 /// Broadcasts a JSON payload to every member of a channel.
 pub async fn broadcast_to_channel(
     state: &Arc<AppState>,

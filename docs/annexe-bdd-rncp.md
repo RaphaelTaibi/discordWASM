@@ -313,6 +313,8 @@ L'implémentation en production utilise cependant un **moteur de stockage sur me
 | `pg_dump` / `.backup` | `store.flush()` → `auth_store.bin` (copie atomique) |
 | `pg_restore` | `Store::load("auth_store.bin")` → reconstruction DashMap + index |
 
+Il s’agit d’une correspondance fonctionnelle et non d’une implémentation équivalente au moteur SQL, l’objectif étant de reproduire les propriétés du modèle relationnel dans un moteur mémoire.
+
 ### Sécurité des données
 
 | Critère RNCP | Implémentation |
@@ -326,12 +328,14 @@ L'implémentation en production utilise cependant un **moteur de stockage sur me
 
 ## 6. Conclusion
 
-La conception de Void suit un **modèle logique relationnel** (entités identifiées, relations par clés étrangères, normalisation 3NF) tout en utilisant un **moteur physique optimisé** pour les contraintes spécifiques du projet (latence WebRTC, instances ARM à ressources limitées). Le fichier `void_store.proto` fournit le schéma typé formel, équivalent fonctionnel d'un DDL SQL, tandis que le script SQL de cette annexe démontre la capacité à transposer ce modèle vers un SGBDR classique si le contexte l'exigeait.
+La conception de Void repose sur un **modèle logique relationnel** conforme aux principes de **Codd** (entités identifiées, relations explicites, normalisation 3NF).
+
+L’implémentation physique s’écarte volontairement d’un **SGBD SQL classique** afin de répondre à des contraintes de performance spécifiques (latence temps réel WebRTC, environnement ARM, réduction des coûts I/O). Elle s’appuie sur un **moteur de stockage en mémoire** de type **key-value**, enrichi par des **index secondaires** et une **persistance par snapshot Protobuf**.
+
+Le fichier `void_store.proto` définit un **schéma de données typé** servant de contrat d’échange indépendant du langage et du moteur de stockage. Il garantit ainsi l’**interopérabilité** du système avec d’autres services (Go, Python, Java, C#) sans nécessiter de reverse-engineering du format binaire.
+
+Le script SQL associé démontre que ce modèle conceptuel est directement transposable dans un **SGBD relationnel standard**, validant ainsi la conformité du design avec les pratiques classiques de modélisation et d’implémentation des bases de données.
 
 ### Interopérabilité
 
 Le fichier `.proto` garantit la **portabilité du schéma de données** au-delà de Rust. En exécutant `protoc --go_out=. void_store.proto` ou `protoc --python_out=. void_store.proto`, on génère instantanément des bindings typés pour Go, Python, Java, C#, etc. Si demain un micro-service d'analytics en Python ou un bot en Go doit lire le `auth_store.bin` ou communiquer avec l'API, il suffit de compiler le `.proto` — pas besoin de reverse-engineering du format binaire. **Le schéma est le contrat d'interface**, indépendant du langage et du moteur de stockage.
-
-
-
-

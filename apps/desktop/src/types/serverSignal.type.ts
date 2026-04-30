@@ -1,4 +1,5 @@
 import VoicePeer from '../models/voice/voicePeer.model';
+import { FriendEventPayload } from '../models/social/friendEventPayload.model';
 
 export type ServerSignal =
     | { type: 'joined'; channelId: string; peers: VoicePeer[]; startedAt: number }
@@ -11,4 +12,6 @@ export type ServerSignal =
     | { type: 'track-map'; userId: string; trackId: string; streamId: string; kind: string }
     | { type: 'chat'; channelId: string; from: string; username: string; message: string; timestamp: number }
     | { type: 'stats'; userId: string; bandwidthBps: number }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    | FriendEventPayload;
+

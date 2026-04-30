@@ -8,6 +8,11 @@ const MARGIN = 8;
 const DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 2;
 
+/** Matches a full tag `pseudo#XXXX` (suffix = 2-8 alphanumeric chars). */
+const TAG_REGEX = /^.+#[A-Za-z0-9]{2,8}$/;
+/** Matches a public-key prefix or full key (base64-ish, at least 8 chars). */
+const PUBKEY_REGEX = /^[A-Za-z0-9+/=_-]{8,}$/;
+
 /**
  * Encapsulates all state and side-effects for the AddFriendPopover.
  * @param onSend - Callback fired when the user sends a friend request.
@@ -66,10 +71,16 @@ export function useAddFriendPopover(onSend: (userId: string) => void) {
     }, [isOpen]);
 
     const doSearch = useCallback(async (q: string) => {
-        if (q.trim().length < MIN_QUERY_LENGTH) { setResults([]); return; }
+        const _trimmed = q.trim();
+        if (_trimmed.length < MIN_QUERY_LENGTH) { setResults([]); return; }
+        // Only fire the API call for valid tag (Pseudo#XXXX) or public key inputs
+        // to avoid noisy partial matches by displayName alone.
+        const _isTag = TAG_REGEX.test(_trimmed);
+        const _isPubkey = PUBKEY_REGEX.test(_trimmed) && !_trimmed.includes('#');
+        if (!_isTag && !_isPubkey) { setResults([]); return; }
         setLoading(true);
         try {
-            const _users = await searchUsers(q.trim());
+            const _users = await searchUsers(_trimmed);
             setResults(_users);
         } catch (err) { console.warn('search failed:', err); setResults([]); }
         finally { setLoading(false); }
@@ -87,6 +98,14 @@ export function useAddFriendPopover(onSend: (userId: string) => void) {
         setSent(userId);
     }, [onSend]);
 
+    /** True when the input is non-empty but doesn't match a tag/pubkey format. */
+    const isInvalidFormat = (() => {
+        const _trimmed = query.trim();
+        if (_trimmed.length < MIN_QUERY_LENGTH) return false;
+        return !TAG_REGEX.test(_trimmed)
+            && !(PUBKEY_REGEX.test(_trimmed) && !_trimmed.includes('#'));
+    })();
+
     return {
         isOpen,
         query,
@@ -97,6 +116,7 @@ export function useAddFriendPopover(onSend: (userId: string) => void) {
         btnRef,
         popoverRef,
         inputRef,
+        isInvalidFormat,
         handleToggle,
         handleInputChange,
         handleSend,

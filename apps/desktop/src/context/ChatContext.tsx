@@ -40,6 +40,22 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         _prevChannelRef.current = activeChannelId;
     }, [activeChannelId, activeServerId, loadHistory, clearChatMessages]);
 
+    // Lightweight live-refresh: while a text channel is active, re-fetch its
+    // history every 5s + on window focus. The signaling WS only broadcasts
+    // chat to voice-channel members, so text channels would otherwise feel
+    // REST-only. Replace this with a `chat.message` WS event when available.
+    useEffect(() => {
+        if (!activeChannelId || !activeServerId) return;
+        const _tick = () => loadHistory(activeServerId, activeChannelId);
+        const _interval = setInterval(_tick, 5_000);
+        const _onFocus = () => _tick();
+        window.addEventListener('focus', _onFocus);
+        return () => {
+            clearInterval(_interval);
+            window.removeEventListener('focus', _onFocus);
+        };
+    }, [activeChannelId, activeServerId, loadHistory]);
+
     // Reset on server switch
     useEffect(() => {
         setActiveChannelId(null);

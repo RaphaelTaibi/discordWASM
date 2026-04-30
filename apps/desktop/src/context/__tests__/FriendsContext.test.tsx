@@ -19,6 +19,10 @@ vi.mock('../../context/AuthContext', () => ({
     useAuth: () => ({ token: 'jwt-test' }),
 }));
 
+vi.mock('../../context/ToastContext', () => ({
+    useToast: () => ({ addToast: vi.fn() }),
+}));
+
 import { FriendsProvider, useFriends } from '../../context/FriendsContext';
 import * as friendsApi from '../../api/friends.api';
 
@@ -48,8 +52,9 @@ describe('FriendsContext', () => {
 
         await act(async () => { await result.current.sendRequest('u42'); });
         expect(friendsApi.sendFriendRequest).toHaveBeenCalledWith('u42');
-        // refresh was called again (listFriends called twice: mount + after sendRequest)
-        expect(friendsApi.listFriends).toHaveBeenCalledTimes(2);
+        // No more polling/auto-refresh on actions — recipients are notified
+        // through the WS bus, the sender just fires-and-forgets.
+        expect(friendsApi.listFriends).toHaveBeenCalledTimes(1);
     });
 
     it('acceptRequest calls API and refreshes', async () => {

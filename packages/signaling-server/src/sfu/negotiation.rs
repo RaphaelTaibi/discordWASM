@@ -337,9 +337,12 @@ async fn catchup_existing_tracks(state: &Arc<AppState>, uid: &str, channel_id: &
         }
     }
 
-    // Phase 3 — broadcast track-maps to other peers
+    // Phase 3 — broadcast track-maps to other peers AND send them directly to
+    // the joining peer so it can associate incoming streams with the right user.
+    // Excluding `uid` here was a bug: the new peer would receive the renegotiated
+    // offer with the catched-up tracks but no mapping, leaving streams orphaned.
     for track_map in track_maps {
-        broadcast_to_channel(state, channel_id, &track_map, Some(uid)).await;
+        broadcast_to_channel(state, channel_id, &track_map, None).await;
     }
 
     // Phase 4 — add all tracks to the new peer's PC, send ONE renegotiation offer

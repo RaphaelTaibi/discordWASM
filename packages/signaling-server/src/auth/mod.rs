@@ -249,22 +249,28 @@ async fn search_users(
                 return false;
             }
 
-            // Match by tag (pseudo#XXXX) — checks both display_name and username
+            // Tag mode (`pseudo#XXXX`): STRICT match — both the name part
+            // and the public-key suffix must match. No name-only fallback,
+            // otherwise unrelated homonyms leak into the results.
             if let (Some(name), Some(suffix)) = (&tag_name, &tag_suffix) {
                 let name_matches = u.display_name.to_lowercase().contains(name)
                     || u.username.contains(name);
-                if name_matches {
-                    if let Some(ref pk) = u.public_key {
-                        let pk_suffix: String = pk.chars().rev().take(4).collect::<String>()
-                            .chars().rev().collect::<String>().to_uppercase();
-                        if pk_suffix.starts_with(suffix.as_str()) {
-                            return true;
-                        }
-                    }
+                if !name_matches {
+                    return false;
                 }
-                // Tag format supplied but no pk match — still try name-only
-                // so the user at least finds candidates.
-                if name_matches { return true; }
+                if let Some(ref pk) = u.public_key {
+                    let pk_suffix: String = pk
+                        .chars()
+                        .rev()
+                        .take(4)
+                        .collect::<String>()
+                        .chars()
+                        .rev()
+                        .collect::<String>()
+                        .to_uppercase();
+                    return pk_suffix.starts_with(suffix.as_str());
+                }
+                return false;
             }
 
             // Match by public_key substring
@@ -275,9 +281,8 @@ async fn search_users(
             }
 
             // Match by display_name or username (plain text)
-            let plain = tag_name.as_deref().unwrap_or(&q);
-            u.display_name.to_lowercase().contains(plain)
-                || u.username.contains(plain)
+            u.display_name.to_lowercase().contains(&q)
+                || u.username.contains(&q)
         })
         .take(20)
         .map(|r| UserSummary::from(r.value()))
