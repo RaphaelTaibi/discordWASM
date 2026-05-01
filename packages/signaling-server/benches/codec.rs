@@ -64,7 +64,10 @@ fn sample_pending(i: usize) -> PendingRequest {
 
 fn proto_headers() -> HeaderMap {
     let mut h = HeaderMap::new();
-    h.insert(header::CONTENT_TYPE, "application/x-protobuf".parse().unwrap());
+    h.insert(
+        header::CONTENT_TYPE,
+        "application/x-protobuf".parse().unwrap(),
+    );
     h
 }
 
@@ -218,4 +221,3 @@ criterion_group!(
     bench_server_message,
 );
 criterion_main!(benches);
-

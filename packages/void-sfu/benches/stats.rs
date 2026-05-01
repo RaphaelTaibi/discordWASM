@@ -39,4 +39,3 @@ fn bench_stats(c: &mut Criterion) {
 
 criterion_group!(benches, bench_stats);
 criterion_main!(benches);
-

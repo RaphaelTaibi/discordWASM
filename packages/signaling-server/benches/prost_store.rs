@@ -16,9 +16,7 @@
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use prost::Message;
 
-use signaling_server::fraud::store::{
-    BanRecord, BanSnapshot, FingerprintRecord, RecidivismRecord,
-};
+use signaling_server::fraud::store::{BanRecord, BanSnapshot, FingerprintRecord, RecidivismRecord};
 use signaling_server::sfu::registry::{ChannelRecord, ServerRecord, ServerSnapshot};
 use signaling_server::store::{FriendRecord, StoreSnapshot, UserRecord};
 
@@ -64,7 +62,11 @@ fn server_record(i: usize) -> ServerRecord {
             .map(|c| ChannelRecord {
                 id: format!("chan-{i:04}-{c:02}"),
                 name: format!("channel-{c}"),
-                r#type: if c % 2 == 0 { "text".into() } else { "voice".into() },
+                r#type: if c % 2 == 0 {
+                    "text".into()
+                } else {
+                    "voice".into()
+                },
             })
             .collect(),
         members: (0..200).map(|m| format!("pk-{:0>56}", m)).collect(),
@@ -113,7 +115,9 @@ fn bench_ban_snapshot(c: &mut Criterion) {
             fingerprints: (0..n / 8)
                 .map(|i| FingerprintRecord {
                     fingerprint: format!("fp-{i:08}"),
-                    ips: (0..3).map(|j| format!("192.168.{}.{}", i & 0xff, j)).collect(),
+                    ips: (0..3)
+                        .map(|j| format!("192.168.{}.{}", i & 0xff, j))
+                        .collect(),
                 })
                 .collect(),
         };
@@ -162,4 +166,3 @@ criterion_group!(
     bench_server_snapshot,
 );
 criterion_main!(benches);
-

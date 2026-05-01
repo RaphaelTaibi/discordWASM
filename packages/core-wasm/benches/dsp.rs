@@ -15,7 +15,7 @@
 //! exercise the underlying Rust functions which carry the actual DSP cost.
 
 use core_wasm::{
-    SmartGate, TransientSuppressor, __bench_compute_seal, activate_rt_context, color_histogram,
+    __bench_compute_seal, SmartGate, TransientSuppressor, activate_rt_context, color_histogram,
     compress_audio, compute_fingerprint, crc32_hash, crest_factor, detect_clipping, detect_peak,
     detect_silence, dominant_freq, is_frozen_frame, normalize_audio, rms_volume, white_noise,
 };
@@ -62,9 +62,11 @@ fn bench_audio_analysis(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("detect_silence", size), &signal, |b, s| {
             b.iter(|| detect_silence(black_box(s), black_box(0.01)))
         });
-        group.bench_with_input(BenchmarkId::new("detect_clipping", size), &signal, |b, s| {
-            b.iter(|| detect_clipping(black_box(s), black_box(0.95)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("detect_clipping", size),
+            &signal,
+            |b, s| b.iter(|| detect_clipping(black_box(s), black_box(0.95))),
+        );
         group.bench_with_input(BenchmarkId::new("crest_factor", size), &signal, |b, s| {
             b.iter(|| crest_factor(black_box(s)))
         });
@@ -168,4 +170,3 @@ criterion_group!(
     bench_hash_and_video
 );
 criterion_main!(benches);
-

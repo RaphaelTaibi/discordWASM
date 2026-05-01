@@ -109,4 +109,3 @@ fn bench_pop_drain(c: &mut Criterion) {
 
 criterion_group!(benches, bench_push, bench_pop_drain);
 criterion_main!(benches);
-

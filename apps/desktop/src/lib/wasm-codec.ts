@@ -23,7 +23,7 @@ export function ensureWasm(): Promise<void> {
     if (!_ready) {
         _ready = init().then(() => undefined);
     }
-    return _ready;
+    return _ready as Promise<void>;
 }
 
 export {
@@ -39,4 +39,3 @@ export {
     encode_update_profile as encodeUpdateProfile,
     encode_friend_request_body as encodeFriendRequestBody,
 };
-

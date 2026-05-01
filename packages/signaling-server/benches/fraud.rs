@@ -94,6 +94,10 @@ fn bench_nonce_store(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_ban_store, bench_fraud_detector, bench_nonce_store);
+criterion_group!(
+    benches,
+    bench_ban_store,
+    bench_fraud_detector,
+    bench_nonce_store
+);
 criterion_main!(benches);
-

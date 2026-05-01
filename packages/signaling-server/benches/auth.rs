@@ -58,7 +58,10 @@ fn bench_argon2(c: &mut Criterion) {
 
     group.bench_function("argon2_verify_password_ko", |b| {
         b.iter(|| {
-            assert!(!verify_password(black_box("wrong-password"), black_box(&stored)));
+            assert!(!verify_password(
+                black_box("wrong-password"),
+                black_box(&stored)
+            ));
         });
     });
 
@@ -137,4 +140,3 @@ fn bench_ed25519(c: &mut Criterion) {
 
 criterion_group!(benches, bench_argon2, bench_jwt, bench_ed25519);
 criterion_main!(benches);
-

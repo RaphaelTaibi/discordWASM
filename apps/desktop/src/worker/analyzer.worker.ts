@@ -13,7 +13,7 @@ init()
         wasmReady = true;
         self.postMessage({ type: 'READY' });
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
         const error = `WASM init failed: ${String(err)}`;
         console.error(error);
         self.postMessage({ type: 'ERROR', error });

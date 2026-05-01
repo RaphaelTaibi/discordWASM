@@ -78,4 +78,3 @@ fn bench_hashmap(c: &mut Criterion) {
 
 criterion_group!(benches, bench_construction, bench_hashmap);
 criterion_main!(benches);
-

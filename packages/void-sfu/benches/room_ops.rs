@@ -24,9 +24,7 @@ use async_trait::async_trait;
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use tokio::runtime::Runtime;
 
-use void_sfu::{
-    Outbound, PeerId, RoomId, Sfu, SfuConfig, SfuResult, SignalSink,
-};
+use void_sfu::{Outbound, PeerId, RoomId, Sfu, SfuConfig, SfuResult, SignalSink};
 
 /// Minimal no-op sink: does nothing on delivery, used to satisfy the
 /// `add_peer` contract without spinning up a real transport.
@@ -85,23 +83,19 @@ fn bench_join_room_fanout(c: &mut Criterion) {
         let joiner = PeerId::from("late-joiner");
         sfu.add_peer(joiner.clone(), Arc::new(NullSink)).unwrap();
 
-        group.bench_with_input(
-            BenchmarkId::new("sfu_join_room_existing", n),
-            &n,
-            |b, _| {
-                b.iter(|| {
-                    rt.block_on(async {
-                        let _ = sfu
-                            .join_room(black_box(&joiner), black_box(room.clone()))
-                            .await
-                            .unwrap();
-                        // Move the joiner back out so each iteration measures
-                        // the same scenario (transition empty→join).
-                        sfu.leave_room(&joiner).await.unwrap();
-                    });
+        group.bench_with_input(BenchmarkId::new("sfu_join_room_existing", n), &n, |b, _| {
+            b.iter(|| {
+                rt.block_on(async {
+                    let _ = sfu
+                        .join_room(black_box(&joiner), black_box(room.clone()))
+                        .await
+                        .unwrap();
+                    // Move the joiner back out so each iteration measures
+                    // the same scenario (transition empty→join).
+                    sfu.leave_room(&joiner).await.unwrap();
                 });
-            },
-        );
+            });
+        });
     }
     group.finish();
 }
@@ -158,4 +152,3 @@ criterion_group!(
     bench_metrics_snapshot,
 );
 criterion_main!(benches);
-
