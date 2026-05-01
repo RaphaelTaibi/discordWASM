@@ -1,7 +1,6 @@
-/// Protobuf encode/decode round-trip tests.
-
-use prost::Message;
 use core_wasm::proto::*;
+/// Protobuf encode/decode round-trip tests.
+use prost::Message;
 
 // ───────────────────────── RegisterBody ───────────────────────
 
@@ -121,14 +120,19 @@ fn pending_request_list_roundtrip() {
 
 #[test]
 fn status_response_roundtrip() {
-    let msg = StatusResponse { status: "ok".into() };
+    let msg = StatusResponse {
+        status: "ok".into(),
+    };
     let decoded = StatusResponse::decode(msg.encode_to_vec().as_slice()).unwrap();
     assert_eq!(decoded.status, "ok");
 }
 
 #[test]
 fn friend_request_result_roundtrip() {
-    let msg = FriendRequestResult { id: "fr1".into(), status: "pending".into() };
+    let msg = FriendRequestResult {
+        id: "fr1".into(),
+        status: "pending".into(),
+    };
     let decoded = FriendRequestResult::decode(msg.encode_to_vec().as_slice()).unwrap();
     assert_eq!(decoded.id, "fr1");
     assert_eq!(decoded.status, "pending");
@@ -160,7 +164,9 @@ fn update_profile_body_roundtrip() {
 
 #[test]
 fn friend_request_body_roundtrip() {
-    let body = FriendRequestBody { to_user_id: "u42".into() };
+    let body = FriendRequestBody {
+        to_user_id: "u42".into(),
+    };
     let decoded = FriendRequestBody::decode(body.encode_to_vec().as_slice()).unwrap();
     assert_eq!(decoded.to_user_id, "u42");
 }
@@ -172,4 +178,3 @@ fn empty_bytes_decode_gives_defaults() {
     let decoded = StatusResponse::decode(&[] as &[u8]).unwrap();
     assert_eq!(decoded.status, "");
 }
-

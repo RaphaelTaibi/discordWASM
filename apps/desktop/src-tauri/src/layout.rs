@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use serde::{Serialize, Deserialize};
-use tauri::{Manager, Emitter};
+use serde::{Deserialize, Serialize};
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -80,13 +80,18 @@ pub struct LayoutBatch {
 // ---------------------------------------------------------------------------
 
 fn get_layout_path(app: &tauri::AppHandle) -> PathBuf {
-    let path = app.path().app_config_dir().expect("Failed to get app config dir");
+    let path = app
+        .path()
+        .app_config_dir()
+        .expect("Failed to get app config dir");
     let _ = fs::create_dir_all(&path);
     path.join("layout.json")
 }
 
 fn sync_and_save(app: &tauri::AppHandle, windows: &HashMap<String, LayoutWindow>) {
-    let batch = LayoutBatch { windows: windows.values().cloned().collect() };
+    let batch = LayoutBatch {
+        windows: windows.values().cloned().collect(),
+    };
     let _ = app.emit("bento:layout:update", &batch);
 
     let app_clone = app.clone();
@@ -109,28 +114,88 @@ pub fn load_layout_from_disk(app: &tauri::AppHandle) -> Option<HashMap<String, L
 /// Provides sensible default panel positions as fractions of the container.
 pub fn default_layout() -> HashMap<String, LayoutWindow> {
     let mut map = HashMap::new();
-    map.insert("sidebar".into(), LayoutWindow { id: "sidebar".into(), x: 0.0, y: 0.1161, w: 0.1559, h: 0.8839, z: 20 });
-    map.insert("channel-panel".into(), LayoutWindow { id: "channel-panel".into(), x: 0.156, y: 0.1212, w: 0.6419, h: 0.8788, z: 10 });
-    map.insert("chat-panel".into(), LayoutWindow { id: "chat-panel".into(), x: 0.7967, y: 0.117, w: 0.2033, h: 0.883, z: 30 });
-    map.insert("friends-bar".into(), LayoutWindow { id: "friends-bar".into(), x: 0.4138, y: 0.005, w: 0.2188, h: 0.048, z: 25 });
-    map.insert("server-bar".into(), LayoutWindow { id: "server-bar".into(), x: 0.0005, y: 0.0, w: 0.1133, h: 0.0698, z: 0 });
+    map.insert(
+        "sidebar".into(),
+        LayoutWindow {
+            id: "sidebar".into(),
+            x: 0.0,
+            y: 0.1161,
+            w: 0.1559,
+            h: 0.8839,
+            z: 20,
+        },
+    );
+    map.insert(
+        "channel-panel".into(),
+        LayoutWindow {
+            id: "channel-panel".into(),
+            x: 0.156,
+            y: 0.1212,
+            w: 0.6419,
+            h: 0.8788,
+            z: 10,
+        },
+    );
+    map.insert(
+        "chat-panel".into(),
+        LayoutWindow {
+            id: "chat-panel".into(),
+            x: 0.7967,
+            y: 0.117,
+            w: 0.2033,
+            h: 0.883,
+            z: 30,
+        },
+    );
+    map.insert(
+        "friends-bar".into(),
+        LayoutWindow {
+            id: "friends-bar".into(),
+            x: 0.4138,
+            y: 0.005,
+            w: 0.2188,
+            h: 0.048,
+            z: 25,
+        },
+    );
+    map.insert(
+        "server-bar".into(),
+        LayoutWindow {
+            id: "server-bar".into(),
+            x: 0.0005,
+            y: 0.0,
+            w: 0.1133,
+            h: 0.0698,
+            z: 0,
+        },
+    );
     map
 }
 
 /// Detects legacy pixel-based layouts persisted before the fraction migration.
 pub fn is_legacy_pixel_layout(map: &HashMap<String, LayoutWindow>) -> bool {
-    map.values().any(|w| w.x > 2.0 || w.y > 2.0 || w.w > 2.0 || w.h > 2.0)
+    map.values()
+        .any(|w| w.x > 2.0 || w.y > 2.0 || w.w > 2.0 || w.h > 2.0)
 }
 
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
-pub fn handle_move(state: &LayoutState, payload: MovePayload, app: &tauri::AppHandle) -> Result<(), String> {
+pub fn handle_move(
+    state: &LayoutState,
+    payload: MovePayload,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
     let mut windows = state.windows.lock().map_err(|_| "Mutex Poisoned")?;
 
     let win = windows.entry(payload.id.clone()).or_insert(LayoutWindow {
-        id: payload.id.clone(), x: 0.05, y: 0.07, w: 0.17, h: 0.56, z: 0,
+        id: payload.id.clone(),
+        x: 0.05,
+        y: 0.07,
+        w: 0.17,
+        h: 0.56,
+        z: 0,
     });
 
     if payload.container_w > 0.0 && payload.container_h > 0.0 {
@@ -147,11 +212,20 @@ pub fn handle_move(state: &LayoutState, payload: MovePayload, app: &tauri::AppHa
     Ok(())
 }
 
-pub fn handle_resize(state: &LayoutState, payload: ResizePayload, app: &tauri::AppHandle) -> Result<(), String> {
+pub fn handle_resize(
+    state: &LayoutState,
+    payload: ResizePayload,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
     let mut windows = state.windows.lock().map_err(|_| "Mutex Poisoned")?;
 
     let win = windows.entry(payload.id.clone()).or_insert(LayoutWindow {
-        id: payload.id.clone(), x: 0.05, y: 0.07, w: 0.17, h: 0.56, z: 0,
+        id: payload.id.clone(),
+        x: 0.05,
+        y: 0.07,
+        w: 0.17,
+        h: 0.56,
+        z: 0,
     });
 
     if payload.container_w > 0.0 && payload.container_h > 0.0 {
@@ -160,8 +234,16 @@ pub fn handle_resize(state: &LayoutState, payload: ResizePayload, app: &tauri::A
     }
 
     let (mw_px, mh_px) = min_sizes_for(&payload.id);
-    let min_w = if payload.container_w > 0.0 { mw_px / payload.container_w } else { 0.03 };
-    let min_h = if payload.container_h > 0.0 { mh_px / payload.container_h } else { 0.03 };
+    let min_w = if payload.container_w > 0.0 {
+        mw_px / payload.container_w
+    } else {
+        0.03
+    };
+    let min_h = if payload.container_h > 0.0 {
+        mh_px / payload.container_h
+    } else {
+        0.03
+    };
     let max_w = (1.0 - win.x - MARGIN_FRAC).max(min_w);
     let max_h = (1.0 - win.y - MARGIN_FRAC).max(min_h);
     win.w = win.w.clamp(min_w, max_w);
@@ -172,7 +254,11 @@ pub fn handle_resize(state: &LayoutState, payload: ResizePayload, app: &tauri::A
 }
 
 /// Swaps width and height of a panel (pixel-aware fraction conversion).
-pub fn handle_swap(state: &LayoutState, payload: SwapPayload, app: &tauri::AppHandle) -> Result<(), String> {
+pub fn handle_swap(
+    state: &LayoutState,
+    payload: SwapPayload,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
     let mut windows = state.windows.lock().map_err(|_| "Mutex Poisoned")?;
 
     let win = windows.get_mut(&payload.id).ok_or("Window not found")?;
@@ -221,7 +307,13 @@ mod tests {
     #[test]
     fn default_layout_contains_all_panels() {
         let layout = default_layout();
-        let expected = ["sidebar", "channel-panel", "chat-panel", "friends-bar", "server-bar"];
+        let expected = [
+            "sidebar",
+            "channel-panel",
+            "chat-panel",
+            "friends-bar",
+            "server-bar",
+        ];
         for id in &expected {
             assert!(layout.contains_key(*id), "missing panel: {id}");
         }
@@ -248,28 +340,71 @@ mod tests {
     #[test]
     fn legacy_detection_pixel_values() {
         let mut map = HashMap::new();
-        map.insert("a".into(), LayoutWindow { id: "a".into(), x: 120.0, y: 80.0, w: 400.0, h: 300.0, z: 0 });
+        map.insert(
+            "a".into(),
+            LayoutWindow {
+                id: "a".into(),
+                x: 120.0,
+                y: 80.0,
+                w: 400.0,
+                h: 300.0,
+                z: 0,
+            },
+        );
         assert!(is_legacy_pixel_layout(&map));
     }
 
     #[test]
     fn legacy_detection_fraction_values() {
         let mut map = HashMap::new();
-        map.insert("a".into(), LayoutWindow { id: "a".into(), x: 0.1, y: 0.2, w: 0.5, h: 0.6, z: 0 });
+        map.insert(
+            "a".into(),
+            LayoutWindow {
+                id: "a".into(),
+                x: 0.1,
+                y: 0.2,
+                w: 0.5,
+                h: 0.6,
+                z: 0,
+            },
+        );
         assert!(!is_legacy_pixel_layout(&map));
     }
 
     #[test]
     fn legacy_detection_boundary_value() {
         let mut map = HashMap::new();
-        map.insert("a".into(), LayoutWindow { id: "a".into(), x: 2.0, y: 0.0, w: 0.5, h: 0.5, z: 0 });
-        assert!(!is_legacy_pixel_layout(&map), "2.0 is the boundary, not legacy");
+        map.insert(
+            "a".into(),
+            LayoutWindow {
+                id: "a".into(),
+                x: 2.0,
+                y: 0.0,
+                w: 0.5,
+                h: 0.5,
+                z: 0,
+            },
+        );
+        assert!(
+            !is_legacy_pixel_layout(&map),
+            "2.0 is the boundary, not legacy"
+        );
     }
 
     #[test]
     fn legacy_detection_just_above_boundary() {
         let mut map = HashMap::new();
-        map.insert("a".into(), LayoutWindow { id: "a".into(), x: 2.01, y: 0.0, w: 0.5, h: 0.5, z: 0 });
+        map.insert(
+            "a".into(),
+            LayoutWindow {
+                id: "a".into(),
+                x: 2.01,
+                y: 0.0,
+                w: 0.5,
+                h: 0.5,
+                z: 0,
+            },
+        );
         assert!(is_legacy_pixel_layout(&map));
     }
 
@@ -281,9 +416,31 @@ mod tests {
     #[test]
     fn legacy_detection_mixed_panels() {
         let mut map = HashMap::new();
-        map.insert("a".into(), LayoutWindow { id: "a".into(), x: 0.1, y: 0.2, w: 0.3, h: 0.4, z: 0 });
-        map.insert("b".into(), LayoutWindow { id: "b".into(), x: 500.0, y: 0.0, w: 0.3, h: 0.4, z: 0 });
-        assert!(is_legacy_pixel_layout(&map), "one pixel-based panel should flag the whole layout");
+        map.insert(
+            "a".into(),
+            LayoutWindow {
+                id: "a".into(),
+                x: 0.1,
+                y: 0.2,
+                w: 0.3,
+                h: 0.4,
+                z: 0,
+            },
+        );
+        map.insert(
+            "b".into(),
+            LayoutWindow {
+                id: "b".into(),
+                x: 500.0,
+                y: 0.0,
+                w: 0.3,
+                h: 0.4,
+                z: 0,
+            },
+        );
+        assert!(
+            is_legacy_pixel_layout(&map),
+            "one pixel-based panel should flag the whole layout"
+        );
     }
 }
-

@@ -1,6 +1,6 @@
-use axum::http::HeaderMap;
 use crate::auth::jwt;
 use crate::errors::ApiError;
+use axum::http::HeaderMap;
 
 /// Authenticated user extracted from the `Authorization: Bearer <token>` header.
 pub struct AuthUser {
@@ -20,6 +20,8 @@ impl AuthUser {
             .ok_or_else(|| ApiError::Unauthorized("Invalid Authorization format".into()))?;
 
         let claims = jwt::decode_token(token)?;
-        Ok(AuthUser { user_id: claims.sub })
+        Ok(AuthUser {
+            user_id: claims.sub,
+        })
     }
 }

@@ -1,6 +1,5 @@
 /// SmartGate and TransientSuppressor struct tests.
 /// Runtime context is NOT activated — exercises fallback paths.
-
 use core_wasm::*;
 
 // ───────────────────────── SmartGate ─────────────────────────
@@ -83,4 +82,3 @@ fn activate_rt_context_correct_seal() {
     let seal = h.finalize();
     assert!(activate_rt_context(seal));
 }
-

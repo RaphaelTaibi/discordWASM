@@ -41,7 +41,10 @@ pub fn list_friends(state: &Arc<AppState>, user_id: &str) -> Vec<UserSummary> {
             } else {
                 &r.value().from_user_id
             };
-            store.users.get(other_id).map(|u| UserSummary::from(u.value()))
+            store
+                .users
+                .get(other_id)
+                .map(|u| UserSummary::from(u.value()))
         })
         .collect()
 }
@@ -170,10 +173,7 @@ pub async fn accept_request(
         notify_user(
             state,
             &from_user_id,
-            &ServerMessage::FriendRequestAccepted {
-                request_id,
-                friend,
-            },
+            &ServerMessage::FriendRequestAccepted { request_id, friend },
         )
         .await;
     }
@@ -264,8 +264,7 @@ pub async fn remove_friend_by_user(
         });
         _found.map(|r| (r.key().clone(), r.value().status.clone()))
     };
-    let (id, status) =
-        entry.ok_or_else(|| ApiError::NotFound("Friendship not found".into()))?;
+    let (id, status) = entry.ok_or_else(|| ApiError::NotFound("Friendship not found".into()))?;
     store.friends.remove(&id);
     store.mark_dirty();
     push_removal_event(state, id, target_user_id, user_id.to_string(), &status).await;
@@ -305,4 +304,3 @@ async fn push_removal_event(
         _ => {}
     }
 }
-

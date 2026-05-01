@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    Encoder, Histogram, IntCounter, IntGauge, TextEncoder,
-    register_histogram, register_int_counter, register_int_gauge,
+    Encoder, Histogram, IntCounter, IntGauge, TextEncoder, register_histogram,
+    register_int_counter, register_int_gauge,
 };
 
 use crate::sfu::broadcast::serialize_message;
@@ -15,13 +15,11 @@ use crate::sfu::state::AppState;
 // Existing metric definitions
 // ---------------------------------------------------------------------------
 
-pub static ACTIVE_PEERS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_active_peers", "Number of connected peers").unwrap()
-});
+pub static ACTIVE_PEERS: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("sfu_active_peers", "Number of connected peers").unwrap());
 
-pub static ACTIVE_CHANNELS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_active_channels", "Number of active channels").unwrap()
-});
+pub static ACTIVE_CHANNELS: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("sfu_active_channels", "Number of active channels").unwrap());
 
 pub static BANDWIDTH_EGRESS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!("sfu_bandwidth_egress_bps", "Outgoing bandwidth (bits/s)").unwrap()
@@ -72,9 +70,8 @@ pub static PEER_CONNECTIONS: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static FORWARDERS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_forwarders", "Total active RTP forwarders").unwrap()
-});
+pub static FORWARDERS: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("sfu_forwarders", "Total active RTP forwarders").unwrap());
 
 pub static DESTINATION_TRACKS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -98,20 +95,22 @@ pub static MEMBERS_PER_CHANNEL: Lazy<Histogram> = Lazy::new(|| {
 // ---------------------------------------------------------------------------
 
 pub static REGISTERED_USERS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_registered_users", "Total registered users in auth store").unwrap()
+    register_int_gauge!(
+        "sfu_registered_users",
+        "Total registered users in auth store"
+    )
+    .unwrap()
 });
 
 pub static REGISTERED_SERVERS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!("sfu_registered_servers", "Total servers in registry").unwrap()
 });
 
-pub static ACTIVE_BANS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_active_bans", "Currently active IP bans").unwrap()
-});
+pub static ACTIVE_BANS: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("sfu_active_bans", "Currently active IP bans").unwrap());
 
-pub static UPTIME_SECONDS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("sfu_uptime_seconds", "Process uptime in seconds").unwrap()
-});
+pub static UPTIME_SECONDS: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("sfu_uptime_seconds", "Process uptime in seconds").unwrap());
 
 /// Process start time — set once at startup.
 static START_TIME: Lazy<Instant> = Lazy::new(Instant::now);

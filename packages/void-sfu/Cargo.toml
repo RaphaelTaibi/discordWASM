@@ -17,4 +17,28 @@ tracing = "0.1"
 dashmap = "6.1.0"
 parking_lot = "0.12"
 
+[features]
+# Enables benchmark-only re-exports (e.g. internal `JitterBuffer`) so
+# criterion can drive the hot paths without leaking them into the stable
+# public API. Never enable in production builds.
+bench = []
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "jitter"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "ids"
+harness = false
+
+[[bench]]
+name = "room_ops"
+harness = false
+
+[[bench]]
+name = "stats"
+harness = false

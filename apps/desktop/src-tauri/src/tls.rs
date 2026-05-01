@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sha2::{Sha256, Digest};
 use base64::{engine::general_purpose, Engine as _};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
-use rustls::client::danger::{ServerCertVerified, ServerCertVerifier, HandshakeSignatureValid};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::{DigitallySignedStruct, Error, SignatureScheme};
-use rustls_pki_types::{CertificateDer, UnixTime, ServerName};
+use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
 
 // ---------------------------------------------------------------------------
 // Compile-time pin hashes (set via env vars for production builds)
@@ -54,18 +54,26 @@ impl ServerCertVerifier for PinningVerifier {
         if cert_hash == PRIMARY_PIN || cert_hash == BACKUP_PIN {
             Ok(ServerCertVerified::assertion())
         } else {
-            Err(Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer))
+            Err(Error::InvalidCertificate(
+                rustls::CertificateError::UnknownIssuer,
+            ))
         }
     }
 
     fn verify_tls12_signature(
-        &self, _m: &[u8], _c: &CertificateDer<'_>, _d: &DigitallySignedStruct,
+        &self,
+        _m: &[u8],
+        _c: &CertificateDer<'_>,
+        _d: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, Error> {
         Ok(HandshakeSignatureValid::assertion())
     }
 
     fn verify_tls13_signature(
-        &self, _m: &[u8], _c: &CertificateDer<'_>, _d: &DigitallySignedStruct,
+        &self,
+        _m: &[u8],
+        _c: &CertificateDer<'_>,
+        _d: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, Error> {
         Ok(HandshakeSignatureValid::assertion())
     }
@@ -146,7 +154,9 @@ pub async fn http_fetch(
     client: tauri::State<'_, reqwest::Client>,
     request: ProxyRequest,
 ) -> Result<ProxyResponse, String> {
-    let method: reqwest::Method = request.method.parse()
+    let method: reqwest::Method = request
+        .method
+        .parse()
         .map_err(|_| format!("Invalid HTTP method: {}", request.method))?;
 
     let mut builder = client.request(method, &request.url);
@@ -170,7 +180,10 @@ pub async fn http_fetch(
 
     let status = res.status().as_u16();
     let body = res.bytes().await.map_err(|e| e.to_string())?;
-    Ok(ProxyResponse { status, body: body.to_vec() })
+    Ok(ProxyResponse {
+        status,
+        body: body.to_vec(),
+    })
 }
 
 #[tauri::command]
@@ -178,9 +191,12 @@ pub async fn call_signaling(
     client: tauri::State<'_, reqwest::Client>,
     url: String,
 ) -> Result<String, String> {
-    client.get(&url).send().await
+    client
+        .get(&url)
+        .send()
+        .await
         .map_err(|e| e.to_string())?
-        .text().await
+        .text()
+        .await
         .map_err(|e| e.to_string())
 }
-

@@ -167,4 +167,3 @@ pub fn spawn_flusher(store: Store) {
         }
     });
 }
-

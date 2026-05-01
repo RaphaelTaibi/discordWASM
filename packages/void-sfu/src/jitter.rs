@@ -69,4 +69,3 @@ impl JitterBuffer {
         diff * 1000 / self.clock_rate
     }
 }
-

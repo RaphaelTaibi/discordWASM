@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use argon2::{self, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::password_hash::SaltString;
+use argon2::{self, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use base64::{engine::general_purpose, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
@@ -71,7 +71,10 @@ pub struct IdentityCache(pub Mutex<HashMap<String, IdentityMeta>>);
 // ---------------------------------------------------------------------------
 
 fn config_dir(app: &tauri::AppHandle) -> PathBuf {
-    let path = app.path().app_config_dir().expect("Failed to get app config dir");
+    let path = app
+        .path()
+        .app_config_dir()
+        .expect("Failed to get app config dir");
     let _ = fs::create_dir_all(&path);
     path
 }
@@ -163,7 +166,10 @@ fn read_metas_from_disk(app: &tauri::AppHandle) -> Vec<IdentityMeta> {
     Vec::new()
 }
 
-fn flush_cache_to_disk(app: &tauri::AppHandle, cache: &HashMap<String, IdentityMeta>) -> Result<(), String> {
+fn flush_cache_to_disk(
+    app: &tauri::AppHandle,
+    cache: &HashMap<String, IdentityMeta>,
+) -> Result<(), String> {
     let metas: Vec<&IdentityMeta> = cache.values().collect();
     let json = serde_json::to_string_pretty(&metas).map_err(|e| e.to_string())?;
     atomic_write(&get_meta_path(app), &json)
@@ -217,9 +223,10 @@ fn hash_password(password: &str) -> Result<String, String> {
 
 /// Verifies a password against a stored Argon2id hash.
 fn verify_password(password: &str, stored_hash: &str) -> Result<bool, String> {
-    let parsed = PasswordHash::new(stored_hash)
-        .map_err(|e| format!("invalid stored hash: {e}"))?;
-    Ok(Argon2::default().verify_password(password.as_bytes(), &parsed).is_ok())
+    let parsed = PasswordHash::new(stored_hash).map_err(|e| format!("invalid stored hash: {e}"))?;
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok())
 }
 
 // ---------------------------------------------------------------------------
@@ -258,23 +265,28 @@ fn migrate_legacy(app: &tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let data = fs::read_to_string(&legacy_path)
-        .map_err(|e| format!("legacy read failed: {e}"))?;
-    let legacy: Vec<LegacyIdentity> = serde_json::from_str(&data)
-        .map_err(|e| format!("legacy parse failed: {e}"))?;
+    let data = fs::read_to_string(&legacy_path).map_err(|e| format!("legacy read failed: {e}"))?;
+    let legacy: Vec<LegacyIdentity> =
+        serde_json::from_str(&data).map_err(|e| format!("legacy parse failed: {e}"))?;
 
-    let metas: Vec<IdentityMeta> = legacy.iter().map(|l| IdentityMeta {
-        timestamp: l.timestamp.parse::<u64>().unwrap_or(0),
-        public_key: l.public_key.clone(),
-        pseudo: l.pseudo.clone(),
-        password_hash: String::new(),
-        avatar: None,
-    }).collect();
+    let metas: Vec<IdentityMeta> = legacy
+        .iter()
+        .map(|l| IdentityMeta {
+            timestamp: l.timestamp.parse::<u64>().unwrap_or(0),
+            public_key: l.public_key.clone(),
+            pseudo: l.pseudo.clone(),
+            password_hash: String::new(),
+            avatar: None,
+        })
+        .collect();
 
-    let secrets: Vec<IdentitySecret> = legacy.iter().map(|l| IdentitySecret {
-        public_key: l.public_key.clone(),
-        private_key: l.private_key.clone(),
-    }).collect();
+    let secrets: Vec<IdentitySecret> = legacy
+        .iter()
+        .map(|l| IdentitySecret {
+            public_key: l.public_key.clone(),
+            private_key: l.private_key.clone(),
+        })
+        .collect();
 
     let json = serde_json::to_string_pretty(&metas).map_err(|e| e.to_string())?;
     atomic_write(&meta_path, &json)?;
@@ -324,7 +336,10 @@ pub fn create_identity(
 
     // Write secret to disk (never cached in RAM)
     let mut secrets = read_secrets(&app);
-    secrets.push(IdentitySecret { public_key: pub_key.clone(), private_key: priv_key });
+    secrets.push(IdentitySecret {
+        public_key: pub_key.clone(),
+        private_key: priv_key,
+    });
     write_secrets(&app, &secrets)?;
 
     let public = IdentityMetaPublic::from(&meta);
@@ -345,7 +360,8 @@ pub fn recover_identity(
     let map = cache.0.lock().map_err(|_| "Cache lock poisoned")?;
     let trimmed = pseudo.trim();
 
-    let candidates: Vec<&IdentityMeta> = map.values()
+    let candidates: Vec<&IdentityMeta> = map
+        .values()
         .filter(|m| m.pseudo.eq_ignore_ascii_case(trimmed))
         .collect();
 
@@ -354,7 +370,9 @@ pub fn recover_identity(
     }
 
     for meta in &candidates {
-        if meta.password_hash.is_empty() { continue; }
+        if meta.password_hash.is_empty() {
+            continue;
+        }
         if verify_password(&password, &meta.password_hash).unwrap_or(false) {
             return Ok(IdentityMetaPublic::from(*meta));
         }
@@ -370,7 +388,9 @@ pub fn find_identity_by_pubkey(
     public_key: String,
 ) -> Result<IdentityMetaPublic, String> {
     let map = cache.0.lock().map_err(|_| "Cache lock poisoned")?;
-    map.get(&public_key).map(IdentityMetaPublic::from).ok_or_else(|| "Identity not found".into())
+    map.get(&public_key)
+        .map(IdentityMetaPublic::from)
+        .ok_or_else(|| "Identity not found".into())
 }
 
 /// Updates the pseudo for an existing identity (secrets are never touched).
@@ -556,13 +576,16 @@ mod tests {
         let cache = IdentityCache(Mutex::new(HashMap::new()));
         {
             let mut map = cache.0.lock().unwrap();
-            map.insert("pk1".into(), IdentityMeta {
-                timestamp: 1,
-                public_key: "pk1".into(),
-                pseudo: "Alice".into(),
-                password_hash: String::new(),
-                avatar: None,
-            });
+            map.insert(
+                "pk1".into(),
+                IdentityMeta {
+                    timestamp: 1,
+                    public_key: "pk1".into(),
+                    pseudo: "Alice".into(),
+                    password_hash: String::new(),
+                    avatar: None,
+                },
+            );
         }
         let map = cache.0.lock().unwrap();
         assert_eq!(map.len(), 1);

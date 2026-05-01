@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'packages/signaling-server/**'
+      - 'packages/void-sfu/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
       - '.github/workflows/deploy-signaling.yml'
       - 'Dockerfile'
       - 'docker-compose.yml'

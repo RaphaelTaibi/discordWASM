@@ -1,7 +1,6 @@
 /// Audio DSP function tests: detect_peak, rms_volume, detect_silence,
 /// compress_audio, detect_clipping, crest_factor, normalize_audio,
 /// dominant_freq, white_noise.
-
 use core_wasm::*;
 
 // ───────────────────────── detect_peak ─────────────────────────
@@ -170,7 +169,10 @@ fn dominant_freq_sine_wave() {
         .collect();
     let detected = dominant_freq(&samples, sample_rate);
     // Autocorrelation-based — allow ±5 Hz tolerance
-    assert!((detected - freq).abs() < 5.0, "detected {detected} Hz, expected ~{freq} Hz");
+    assert!(
+        (detected - freq).abs() < 5.0,
+        "detected {detected} Hz, expected ~{freq} Hz"
+    );
 }
 
 // ───────────────────────── white_noise ────────────────────────
@@ -195,4 +197,3 @@ fn white_noise_different_seeds_differ() {
     let b = white_noise(64, 1.0, 2);
     assert_ne!(a, b);
 }
-

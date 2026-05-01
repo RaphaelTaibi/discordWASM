@@ -40,7 +40,8 @@ graph TB
     subgraph "API Layer"
         HTTP["http-client.ts<br/>Protobuf + JSON content negotiation"]
         AUTH_API["auth.api.ts<br/>register · login · getMe · search"]
-        FRIENDS_API["friends.api.ts<br/>list · send · accept · reject · remove"]
+        FRIENDS_WS["friends.ws.ts<br/>WS-RPC: list · pending · send · accept · reject · remove"]
+        FRIENDS_BUS["signalingBus.ts<br/>Push events: FriendRequestReceived/Accepted/Removed"]
     end
 
     subgraph "Workers (Off main thread)"
@@ -50,7 +51,8 @@ graph TB
 
     C_AUTH & C_CHAN & C_CHAT & C_LAYOUT & C_SETTINGS & C_SIDEBAR & C_STREAM & C_UI --> AUTH & VOICE & STREAM & CHAT & SERVER & TOAST & BENTO
     AUTH & VOICE & STREAM --> H1 & H2 & H4 & H5 & H6 & H7
-    H1 --> HTTP --> AUTH_API & FRIENDS_API
+    H1 --> HTTP --> AUTH_API & FRIENDS_WS
+    H1 --> FRIENDS_BUS
     VOICE --> WORKLET
     STREAM --> ANALYZER
 ```
@@ -60,9 +62,9 @@ graph TB
 ```
 src/
 ├── api/                  # HTTP client + endpoint modules
-│   ├── http-client.ts    # Protobuf/JSON content negotiation
-│   ├── auth.api.ts       # Auth endpoints
-│   └── friends.api.ts    # Friends endpoints
+│   ├── http-client.ts    # Protobuf/JSON content negotiation (REST)
+│   ├── auth.api.ts       # Auth REST endpoints
+│   └── friends.ws.ts     # Friends WS-RPC client (canonical)
 ├── components/           # Dumb, agnostic UI components
 │   ├── auth/             # Login screen
 │   ├── channel/          # Channel list, items, creation modal
@@ -173,7 +175,8 @@ graph TB
     subgraph "Couche API"
         HTTP["http-client.ts<br/>Négociation de contenu Protobuf + JSON"]
         AUTH_API["auth.api.ts<br/>register · login · getMe · search"]
-        FRIENDS_API["friends.api.ts<br/>list · send · accept · reject · remove"]
+        FRIENDS_WS["friends.ws.ts<br/>WS-RPC : list · pending · send · accept · reject · remove"]
+        FRIENDS_BUS["signalingBus.ts<br/>Événements push : FriendRequestReceived/Accepted/Removed"]
     end
 
     subgraph "Workers (Hors thread principal)"
@@ -183,7 +186,8 @@ graph TB
 
     C_AUTH & C_CHAN & C_CHAT & C_LAYOUT & C_SETTINGS & C_SIDEBAR & C_STREAM & C_UI --> AUTH & VOICE & STREAM & CHAT & SERVER & TOAST & BENTO
     AUTH & VOICE & STREAM --> H1 & H2 & H4 & H5 & H6 & H7
-    H1 --> HTTP --> AUTH_API & FRIENDS_API
+    H1 --> HTTP --> AUTH_API & FRIENDS_WS
+    H1 --> FRIENDS_BUS
     VOICE --> WORKLET
     STREAM --> ANALYZER
 ```

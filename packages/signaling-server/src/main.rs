@@ -1,16 +1,15 @@
-mod auth;
-mod errors;
-mod fraud;
-mod friends;
-mod metrics;
-mod models;
-mod negotiate;
-mod nonce;
-mod sfu;
-mod store;
+// Copyright (c) 2025 Raphael Taibi. All rights reserved.
+// Licensed under the Business Source License 1.1 (BUSL-1.1).
+// Use of this source code is governed by the LICENSE file at the
+// repository root. Change Date: 2031-04-07. Change License:
+// GPL-3.0-or-later.
+// SPDX-License-Identifier: BUSL-1.1
 
-#[cfg(test)]
-mod tests;
+//! Signaling server daemon entry point. The actual modules live in the
+//! `signaling_server` library crate (`src/lib.rs`) so they can be reused
+//! by integration tests and criterion benchmarks.
+
+use signaling_server::{auth, fraud, friends, metrics, nonce, sfu, store};
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -119,14 +118,20 @@ async fn main() {
         .route("/metrics", get(metrics::handler))
         .route("/api/auth/nonce", get(nonce::get_nonce))
         .with_state(Arc::clone(&app_state))
-        .nest("/api/servers", sfu::routes::router().with_state(Arc::clone(&app_state)))
+        .nest(
+            "/api/servers",
+            sfu::routes::router().with_state(Arc::clone(&app_state)),
+        )
         .nest(
             "/api/auth",
             auth::router()
                 .with_state(auth_store.clone())
                 .layer(Extension(server_registry_for_auth)),
         )
-        .nest("/api/friends", friends::router().with_state(Arc::clone(&app_state)))
+        .nest(
+            "/api/friends",
+            friends::router().with_state(Arc::clone(&app_state)),
+        )
         .layer(Extension(fraud_state))
         .layer(Extension(nonce_store))
         .layer(CorsLayer::permissive())
@@ -162,18 +167,16 @@ async fn main() {
             std::process::exit(1);
         }
     } else {
-        let tls_config = match RustlsConfig::from_pem_file(
-            PathBuf::from("cert.pem"),
-            PathBuf::from("key.pem"),
-        )
-        .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Failed to load cert.pem/key.pem: {:?}", e);
-                std::process::exit(1);
-            }
-        };
+        let tls_config =
+            match RustlsConfig::from_pem_file(PathBuf::from("cert.pem"), PathBuf::from("key.pem"))
+                .await
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Failed to load cert.pem/key.pem: {:?}", e);
+                    std::process::exit(1);
+                }
+            };
 
         println!(
             "PROD MODE: SFU Server running on https://{} | UDP Range: 10000-20000",

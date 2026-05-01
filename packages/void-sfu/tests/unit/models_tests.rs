@@ -11,7 +11,10 @@ use void_sfu::IceCandidate;
 
 #[test]
 fn ice_candidate_new_sets_optional_fields_to_none() {
-    let c = IceCandidate::new("candidate:1 1 udp 2122260223 192.0.2.1 49152 typ host", None);
+    let c = IceCandidate::new(
+        "candidate:1 1 udp 2122260223 192.0.2.1 49152 typ host",
+        None,
+    );
     assert_eq!(
         c.candidate,
         "candidate:1 1 udp 2122260223 192.0.2.1 49152 typ host"
@@ -38,4 +41,3 @@ fn ice_candidate_clone_preserves_all_fields() {
     let copy = c.clone();
     assert_eq!(c, copy);
 }
-

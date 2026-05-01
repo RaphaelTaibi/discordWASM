@@ -87,7 +87,9 @@ fn user_summary_optional_fields_none() {
 
 #[test]
 fn status_response_json() {
-    let sr = StatusResponse { status: "accepted".into() };
+    let sr = StatusResponse {
+        status: "accepted".into(),
+    };
     let json = serde_json::to_value(&sr).unwrap();
     assert_eq!(json["status"], "accepted");
 }
@@ -197,4 +199,3 @@ fn search_query_deserialize() {
     let q: SearchQuery = serde_json::from_str(r#"{"q":"test"}"#).unwrap();
     assert_eq!(q.q, "test");
 }
-

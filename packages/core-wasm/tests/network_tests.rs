@@ -1,5 +1,4 @@
 /// Network, conversion, and hashing function tests.
-
 use core_wasm::*;
 
 // ───────────────── calculate_network_quality ──────────────────
@@ -46,7 +45,7 @@ fn process_network_stats_averaged() {
     let result = process_network_stats(200.0, 2.0, 0.0, 0.0, 0.1, 40.0);
     // final_rtt = 100, loss = 0.05, jitter = 20
     assert_eq!(result.len(), 5);
-    assert_eq!(result[0], 100.0);  // ping
+    assert_eq!(result[0], 100.0); // ping
     assert!((result[1] - 5.0).abs() < 0.01); // loss %
     assert!((result[2] - 20.0).abs() < 0.01); // jitter
 }
@@ -157,4 +156,3 @@ fn check_quality_normal_bitrate() {
     let msg = check_quality(8000);
     assert!(msg.contains("Analysé par Rust"));
 }
-

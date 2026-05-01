@@ -38,10 +38,7 @@ fn missing_header_is_unauthorized() {
 #[test]
 fn wrong_prefix_is_unauthorized() {
     let mut headers = HeaderMap::new();
-    headers.insert(
-        "authorization",
-        HeaderValue::from_static("Basic abc123"),
-    );
+    headers.insert("authorization", HeaderValue::from_static("Basic abc123"));
     let result = AuthUser::from_headers(&headers);
     assert!(result.is_err());
 }
@@ -68,11 +65,7 @@ fn invalid_jwt_is_unauthorized() {
 #[test]
 fn empty_bearer_token() {
     let mut headers = HeaderMap::new();
-    headers.insert(
-        "authorization",
-        HeaderValue::from_static("Bearer "),
-    );
+    headers.insert("authorization", HeaderValue::from_static("Bearer "));
     let result = AuthUser::from_headers(&headers);
     assert!(result.is_err());
 }
-

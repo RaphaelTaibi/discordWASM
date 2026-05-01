@@ -8,4 +8,3 @@
 //! Integration test grouping module.
 
 mod sfu_lifecycle_tests;
-

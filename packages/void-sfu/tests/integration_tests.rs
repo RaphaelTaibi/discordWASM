@@ -8,4 +8,3 @@
 //! Cargo integration-test entry: drives the integration sub-modules.
 
 mod integration;
-

@@ -64,7 +64,10 @@ fn concurrent_generation_uniqueness() {
         })
         .collect();
 
-    let nonces: Vec<String> = handles.into_iter().map(|h| h.join().expect("join")).collect();
+    let nonces: Vec<String> = handles
+        .into_iter()
+        .map(|h| h.join().expect("join"))
+        .collect();
     let mut unique = nonces.clone();
     unique.sort();
     unique.dedup();
@@ -98,8 +101,14 @@ fn concurrent_consume_exactly_once() {
         })
         .collect();
 
-    for h in handles { h.join().expect("join"); }
-    assert_eq!(success_count.load(Ordering::Relaxed), 1, "exactly one consumer wins");
+    for h in handles {
+        h.join().expect("join");
+    }
+    assert_eq!(
+        success_count.load(Ordering::Relaxed),
+        1,
+        "exactly one consumer wins"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -116,4 +125,3 @@ fn max_pending_limit() {
     let err = store.generate();
     assert!(err.is_err(), "should reject beyond MAX_PENDING");
 }
-

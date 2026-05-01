@@ -133,7 +133,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/:id/members", get(list_server_members))
         .route("/:id/channels", post(create_channel))
         .route("/:id/channels/:channel_id", delete(delete_channel))
-        .route("/:id/channels/:channel_id/messages", get(get_channel_messages))
+        .route(
+            "/:id/channels/:channel_id/messages",
+            get(get_channel_messages),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -148,14 +151,17 @@ async fn create_server(
 ) -> Result<Json<ServerResponse>, ApiError> {
     let name = body.name.trim().to_string();
     if name.len() < 2 {
-        return Err(ApiError::BadRequest("Name must be at least 2 characters".into()));
+        return Err(ApiError::BadRequest(
+            "Name must be at least 2 characters".into(),
+        ));
     }
 
     nonces.consume(&body.nonce)?;
 
     let message = format!("create:{}:{}", name, body.nonce);
-    let valid = crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let valid =
+        crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
+            .map_err(|e| ApiError::BadRequest(e))?;
 
     if !valid {
         return Err(ApiError::Forbidden("Invalid ownership signature".into()));
@@ -229,7 +235,9 @@ async fn list_servers(
                 .filter_map(|sid| state.server_registry.servers.get(sid))
                 .map(|kv| {
                     let s = kv.value();
-                    let is_owner = caller_pk.as_ref().map_or(false, |cpk| *cpk == s.owner_public_key);
+                    let is_owner = caller_pk
+                        .as_ref()
+                        .map_or(false, |cpk| *cpk == s.owner_public_key);
                     ServerResponse::from_server(s, is_owner)
                 })
                 .collect();
@@ -278,11 +286,7 @@ async fn list_servers(
 /// Detects servers whose `owner_public_key` is absent from the auth store
 /// (orphaned after identity or auth-store data loss) and transfers ownership
 /// to the authenticated caller, who must already be a member.
-fn heal_orphaned_ownership(
-    state: &AppState,
-    caller_pk: &str,
-    results: &mut Vec<ServerResponse>,
-) {
+fn heal_orphaned_ownership(state: &AppState, caller_pk: &str, results: &mut Vec<ServerResponse>) {
     let mut healed = false;
 
     for resp in results.iter_mut() {
@@ -402,8 +406,9 @@ async fn delete_server(
     nonces.consume(&body.nonce)?;
 
     let message = format!("delete:{}:{}", id, body.nonce);
-    let valid = crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let valid =
+        crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
+            .map_err(|e| ApiError::BadRequest(e))?;
 
     if !valid {
         return Err(ApiError::Forbidden("Invalid ownership signature".into()));
@@ -498,8 +503,9 @@ async fn create_channel(
     nonces.consume(&body.nonce)?;
 
     let message = format!("create_channel:{}:{}:{}", id, body.name, body.nonce);
-    let valid = crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let valid =
+        crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
+            .map_err(|e| ApiError::BadRequest(e))?;
 
     if !valid {
         return Err(ApiError::Forbidden("Invalid ownership signature".into()));
@@ -539,8 +545,9 @@ async fn delete_channel(
     nonces.consume(&body.nonce)?;
 
     let message = format!("delete_channel:{}:{}:{}", id, channel_id, body.nonce);
-    let valid = crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
-        .map_err(|e| ApiError::BadRequest(e))?;
+    let valid =
+        crypto::verify_signature(&body.owner_public_key, message.as_bytes(), &body.signature)
+            .map_err(|e| ApiError::BadRequest(e))?;
 
     if !valid {
         return Err(ApiError::Forbidden("Invalid ownership signature".into()));
@@ -568,4 +575,3 @@ async fn get_channel_messages(
         .unwrap_or_default();
     Json(entries)
 }
-

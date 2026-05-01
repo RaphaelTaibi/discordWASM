@@ -1,19 +1,17 @@
 use std::sync::LazyLock;
 
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use crate::models::Claims;
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 
 /// JWT secret cached at process start — avoids env-var lookup + heap allocation per call.
 /// Panics in production if JWT_SECRET is not set or empty.
-static JWT_SECRET: LazyLock<Vec<u8>> = LazyLock::new(|| {
-    match std::env::var("JWT_SECRET") {
-        Ok(s) if !s.is_empty() => s.into_bytes(),
-        _ => {
-            if cfg!(test) || std::env::var("DEV_MODE").is_ok() {
-                "dev-secret-do-not-use-in-prod".as_bytes().to_vec()
-            } else {
-                panic!("JWT_SECRET environment variable must be set in production")
-            }
+static JWT_SECRET: LazyLock<Vec<u8>> = LazyLock::new(|| match std::env::var("JWT_SECRET") {
+    Ok(s) if !s.is_empty() => s.into_bytes(),
+    _ => {
+        if cfg!(test) || std::env::var("DEV_MODE").is_ok() {
+            "dev-secret-do-not-use-in-prod".as_bytes().to_vec()
+        } else {
+            panic!("JWT_SECRET environment variable must be set in production")
         }
     }
 });
@@ -30,7 +28,11 @@ pub fn create_token(user_id: &str) -> Result<String, jsonwebtoken::errors::Error
         sub: user_id.to_string(),
         exp,
     };
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(&JWT_SECRET))
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(&JWT_SECRET),
+    )
 }
 
 /// Decodes and validates a JWT, returning the embedded claims.

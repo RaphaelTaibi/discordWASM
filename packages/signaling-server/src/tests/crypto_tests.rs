@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use ed25519_dalek::{Signer, SigningKey};
 
 use crate::sfu::crypto::verify_signature;
@@ -105,4 +105,3 @@ fn deterministic_verification() {
         assert!(result);
     }
 }
-

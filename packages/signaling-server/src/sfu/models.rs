@@ -25,7 +25,6 @@ pub struct Server {
     pub members: Vec<String>,
 }
 
-
 // ---------------------------------------------------------------------------
 // WebSocket protocol — Client → Server
 // ---------------------------------------------------------------------------
@@ -67,7 +66,6 @@ pub enum ClientMessage {
     // -----------------------------------------------------------------------
     // WS-only flows (Phase 3) — replace per-feature REST polling
     // -----------------------------------------------------------------------
-
     /// Validates the JWT and binds the authenticated user_id to the WS
     /// connection. Required before issuing any RPC call.
     #[serde(rename_all = "camelCase")]
@@ -125,11 +123,17 @@ pub enum ServerMessage {
         user_id: String,
     },
     #[serde(rename_all = "camelCase")]
-    Answer { sdp: serde_json::Value },
+    Answer {
+        sdp: serde_json::Value,
+    },
     #[serde(rename_all = "camelCase")]
-    Offer { sdp: serde_json::Value },
+    Offer {
+        sdp: serde_json::Value,
+    },
     #[serde(rename_all = "camelCase")]
-    Ice { candidate: serde_json::Value },
+    Ice {
+        candidate: serde_json::Value,
+    },
     #[serde(rename_all = "camelCase")]
     PeerState {
         channel_id: String,
@@ -157,11 +161,15 @@ pub enum ServerMessage {
         user_id: String,
         bandwidth_bps: u64,
     },
-    Error { message: String },
+    Error {
+        message: String,
+    },
 
     // ---- Friend social events (unchanged) ----
     #[serde(rename_all = "camelCase")]
-    FriendRequestReceived { request: PendingRequest },
+    FriendRequestReceived {
+        request: PendingRequest,
+    },
     #[serde(rename_all = "camelCase")]
     FriendRequestAccepted {
         request_id: String,
@@ -184,11 +192,13 @@ pub enum ServerMessage {
     },
 
     // ---- Phase 3 WS-only events ----
-
     /// Acknowledges an `Authenticate` call. `ok = false` means the WS is
     /// still anonymous and must NOT issue authenticated RPCs.
     #[serde(rename_all = "camelCase")]
-    Authenticated { user_id: String, ok: bool },
+    Authenticated {
+        user_id: String,
+        ok: bool,
+    },
 
     /// One member's online presence on a server changed.
     #[serde(rename_all = "camelCase")]
@@ -240,4 +250,3 @@ pub struct PeerInfo {
     pub is_muted: bool,
     pub is_deafened: bool,
 }
-

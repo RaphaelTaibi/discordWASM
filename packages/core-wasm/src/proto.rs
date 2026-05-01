@@ -150,4 +150,3 @@ pub struct FriendRequestBody {
     #[prost(string, tag = "1")]
     pub to_user_id: String,
 }
-

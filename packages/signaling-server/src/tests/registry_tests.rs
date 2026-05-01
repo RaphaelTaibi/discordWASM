@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use dashmap::DashMap;
@@ -50,10 +50,9 @@ fn roundtrip_single_server() {
     reg.servers.insert(server.id.clone(), server.clone());
     reg.flush().expect("flush");
 
-    let reloaded = ServerRegistry::try_load_bin(
-        &dir.path().join("test_servers.bin").to_string_lossy(),
-    )
-    .expect("reload");
+    let reloaded =
+        ServerRegistry::try_load_bin(&dir.path().join("test_servers.bin").to_string_lossy())
+            .expect("reload");
 
     assert_eq!(reloaded.len(), 1);
     assert_eq!(reloaded[0].id, server.id);
@@ -92,7 +91,11 @@ fn concurrent_1000_inserts_then_flush_integrity() {
     assert_eq!(reg_arc.servers.len(), 1000);
     reg_arc.flush().expect("flush after 1000 inserts");
 
-    let path_str = dir.path().join("test_servers.bin").to_string_lossy().into_owned();
+    let path_str = dir
+        .path()
+        .join("test_servers.bin")
+        .to_string_lossy()
+        .into_owned();
     let reloaded = ServerRegistry::try_load_bin(&path_str).expect("reload");
     assert_eq!(reloaded.len(), 1000);
 
@@ -150,9 +153,17 @@ fn concurrent_writes_and_flushes() {
 
     reg.flush().expect("final flush");
 
-    let path_str = dir.path().join("test_servers.bin").to_string_lossy().into_owned();
+    let path_str = dir
+        .path()
+        .join("test_servers.bin")
+        .to_string_lossy()
+        .into_owned();
     let reloaded = ServerRegistry::try_load_bin(&path_str).expect("reload");
-    assert_eq!(reloaded.len(), 1000, "Expected 1000 servers after concurrent writes+flushes");
+    assert_eq!(
+        reloaded.len(),
+        1000,
+        "Expected 1000 servers after concurrent writes+flushes"
+    );
 
     let raw = std::fs::read(dir.path().join("test_servers.bin")).expect("read bin");
     let snap = ServerSnapshot::decode(raw.as_slice()).expect("protobuf decode must succeed");
@@ -196,7 +207,10 @@ fn member_index_integrity_under_load() {
             "Owner index missing {server_id}"
         );
 
-        let member_entry = reg.member_index.get(&member_pk).expect("member pk in index");
+        let member_entry = reg
+            .member_index
+            .get(&member_pk)
+            .expect("member pk in index");
         assert!(
             member_entry.contains(&server_id),
             "Member index missing {server_id}"
@@ -219,8 +233,14 @@ fn no_leftover_tmp_file_after_flush() {
     reg.flush().expect("flush");
 
     let tmp_path = dir.path().join("test_servers.bin.tmp");
-    assert!(!tmp_path.exists(), ".bin.tmp should be removed after successful flush");
-    assert!(dir.path().join("test_servers.bin").exists(), ".bin must exist");
+    assert!(
+        !tmp_path.exists(),
+        ".bin.tmp should be removed after successful flush"
+    );
+    assert!(
+        dir.path().join("test_servers.bin").exists(),
+        ".bin must exist"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -261,4 +281,3 @@ fn repeated_flush_reload_consistency() {
     let final_reg = ServerRegistry::load(&path_str);
     assert_eq!(final_reg.servers.len(), 500, "10 rounds × 50 servers");
 }
-

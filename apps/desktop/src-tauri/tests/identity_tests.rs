@@ -1,6 +1,5 @@
 /// Identity struct serialization and IdentityMetaPublic conversion tests.
 /// These test the pure data layer without Tauri AppHandle.
-
 use desktop_lib::identity::{IdentityMeta, IdentityMetaPublic};
 
 // ───────────────────── IdentityMeta serde ────────────────────
@@ -20,7 +19,10 @@ fn identity_meta_serialize_roundtrip() {
     assert_eq!(decoded.public_key, "pk-test");
     assert_eq!(decoded.pseudo, "Alice");
     assert_eq!(decoded.password_hash, "$argon2id$hash");
-    assert_eq!(decoded.avatar, Some("data:image/png;base64,abc".to_string()));
+    assert_eq!(
+        decoded.avatar,
+        Some("data:image/png;base64,abc".to_string())
+    );
 }
 
 #[test]
@@ -177,4 +179,3 @@ fn identity_meta_multiple_conversions_stable() {
     assert_eq!(p1.pseudo, p2.pseudo);
     assert_eq!(p1.avatar, p2.avatar);
 }
-

@@ -65,29 +65,28 @@ pub fn decode_removed_response(bytes: &[u8]) -> Result<JsValue, JsError> {
 
 #[wasm_bindgen]
 pub fn encode_register_body(val: JsValue) -> Result<Vec<u8>, JsError> {
-    let body: proto::RegisterBody = serde_wasm_bindgen::from_value(val)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let body: proto::RegisterBody =
+        serde_wasm_bindgen::from_value(val).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(body.encode_to_vec())
 }
 
 #[wasm_bindgen]
 pub fn encode_login_body(val: JsValue) -> Result<Vec<u8>, JsError> {
-    let body: proto::LoginBody = serde_wasm_bindgen::from_value(val)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let body: proto::LoginBody =
+        serde_wasm_bindgen::from_value(val).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(body.encode_to_vec())
 }
 
 #[wasm_bindgen]
 pub fn encode_update_profile(val: JsValue) -> Result<Vec<u8>, JsError> {
-    let body: proto::UpdateProfileBody = serde_wasm_bindgen::from_value(val)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let body: proto::UpdateProfileBody =
+        serde_wasm_bindgen::from_value(val).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(body.encode_to_vec())
 }
 
 #[wasm_bindgen]
 pub fn encode_friend_request_body(val: JsValue) -> Result<Vec<u8>, JsError> {
-    let body: proto::FriendRequestBody = serde_wasm_bindgen::from_value(val)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let body: proto::FriendRequestBody =
+        serde_wasm_bindgen::from_value(val).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(body.encode_to_vec())
 }
-

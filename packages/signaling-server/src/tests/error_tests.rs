@@ -1,5 +1,5 @@
-use axum::response::IntoResponse;
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 
 use crate::errors::ApiError;
 
@@ -66,4 +66,3 @@ fn jwt_error_converts_to_unauthorized() {
     let resp = api_err.into_response();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
-

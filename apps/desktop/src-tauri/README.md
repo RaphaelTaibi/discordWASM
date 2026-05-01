@@ -1,165 +1,277 @@
-# Void — Tauri Backend
-
-Rust-powered desktop backend using **Tauri v2**. Handles local identity management, TLS certificate pinning, and the Bento Layout engine.
-
-## Architecture
-
-```mermaid
-graph LR
-    subgraph "Tauri Backend (Rust)"
-        LIB["lib.rs<br/>App setup · TLS Pinning · HTTP client"]
-        ID["identity.rs<br/>Ed25519 · Argon2id · Secure storage"]
-        BENTO["Bento Layout Engine<br/>Drag · Resize · Persist layout.json"]
-    end
-
-    subgraph "Tauri Plugins v2"
-        WS["plugin-websocket<br/>WSS with custom TLS"]
-        UPD["plugin-updater<br/>GitHub releases auto-update"]
-        LOG["plugin-log<br/>Structured logging"]
-        OPEN["plugin-opener<br/>OS-native file/URL open"]
-    end
-
-    REACT["React Frontend"] -- "IPC invoke" --> LIB
-    REACT -- "IPC invoke" --> ID
-    REACT -- "Tauri events" --> BENTO
-    REACT -- "plugin API" --> WS
-    REACT -- "plugin API" --> UPD
-```
-
-## Tauri Commands
-
-| Command | Module | Description |
-|---|---|---|
-| `create_identity` | `identity.rs` | Generates Ed25519 keypair, hashes password with Argon2id, persists to disk |
-| `find_identity_by_pubkey` | `identity.rs` | Looks up an identity by its public key |
-| `update_identity_pseudo` | `identity.rs` | Updates the display name of a stored identity |
-| `update_identity_avatar` | `identity.rs` | Updates the avatar data of a stored identity |
-| `recover_identity` | `identity.rs` | Recovers an identity using pseudo + password (Argon2id verification) |
-| `call_signaling` | `lib.rs` | HTTP(S) request to the signaling server with TLS certificate pinning |
-
-## TLS Certificate Pinning
-
-The app embeds a SHA-256 fingerprint of the server certificate. All HTTPS/WSS connections verify the remote cert against the pinned hash via a custom `rustls::ServerCertVerifier` implementation (`MyVerifier`). This prevents MITM attacks even if a CA is compromised.
-
-```mermaid
-flowchart LR
-    REQ["Outgoing TLS handshake"] --> VERIFY["MyVerifier::verify_server_cert()"]
-    VERIFY -- "SHA-256 match" --> OK["Connection established"]
-    VERIFY -- "Mismatch" --> REJECT["Connection refused"]
-```
-
-## Bento Layout Engine
-
-A persistent window layout system communicated to the frontend via Tauri events:
-
-- **`bento:layout:move`** — Sidebar drag repositioning
-- **`bento:layout:resize`** — Sidebar resize
-- **`bento:layout:update`** — Full layout state sync
-
-Layout is persisted to `layout.json` in the app data directory.
-
-## Identity Storage
-
-```
-<app_data>/
-├── identities/
-│   ├── <pubkey_hex>.secret    # Encrypted private key (Argon2id)
-│   └── <pubkey_hex>.meta      # Public metadata (pseudo, avatar)
-└── layout.json                # Bento layout persistence
-```
-
-## Dependencies
-
-| Crate | Role |
-|---|---|
-| `tauri` v2 | Desktop app framework |
-| `ed25519-dalek` | Ed25519 keypair generation/signing |
-| `argon2` | Argon2id password hashing |
-| `rustls` | TLS with custom cert verification |
-| `reqwest` | HTTP client (TLS pinned) |
-| `serde` / `serde_json` | Serialization |
-
-## License
-
-**BSL-1.1** — See [LICENSE](../../../LICENSE).
+﻿# Void — Tauri Native Backend
+Native shell of the Void desktop application, built with **Tauri v2**. Owns the things the React frontend cannot do safely on its own:
+- **Local identity** — Ed25519 keypair generation, Argon2id-protected disk store, signing service.
+- **Bento layout state** — persistent, percent-based window arrangement state with debounced disk flush and live IPC fan-out.
+- **TLS / network egress** — outbound HTTP+WebSocket clients pinned against compile-time SPKI hashes (no MITM downgrade).
+- **DSP runtime seal** — deterministic CRC token used by the audio worklet to refuse to start without the native shell.
+> **License:** Business Source License 1.1 (BSL-1.1) — see the repository [`LICENSE`](../../../LICENSE).
 
 ---
 
-# Void — Backend Tauri (FR)
+## Why a Rust shell?
 
-Backend desktop en Rust utilisant **Tauri v2**. Gère l'identité locale, le certificate pinning TLS et le moteur Bento Layout.
+Putting these concerns in the WebView would expose:
+
+- private keys to any compromised JS dependency,
+- raw bytes of the password hash to debugger / extensions,
+- TLS trust decisions to the platform's certificate store (broad on consumer machines).
+
+The native shell keeps the secret material **outside the WebView's address space** and only exposes signed, scoped IPC commands to the React layer.
+
+---
 
 ## Architecture
 
 ```mermaid
-graph LR
-    subgraph "Backend Tauri (Rust)"
-        LIB["lib.rs<br/>Setup app · TLS Pinning · Client HTTP"]
-        ID["identity.rs<br/>Ed25519 · Argon2id · Stockage sécurisé"]
-        BENTO["Moteur Bento Layout<br/>Drag · Resize · Persist layout.json"]
+graph TB
+    subgraph "WebView (React + Vite)"
+        REACT["React 19 app"]
+        WORKLET["AudioWorklet<br/>(noise-gate)"]
     end
 
-    subgraph "Plugins Tauri v2"
-        WS["plugin-websocket<br/>WSS avec TLS custom"]
-        UPD["plugin-updater<br/>Mise à jour auto via GitHub"]
-        LOG["plugin-log<br/>Logging structuré"]
-        OPEN["plugin-opener<br/>Ouverture fichier/URL native"]
+    subgraph "Tauri runtime (Rust)"
+        ENTRY["lib.rs<br/>tauri::Builder · plugins · invoke handler"]
+
+        subgraph "identity.rs"
+            ID_CMDS["create_identity · recover_identity<br/>find_identity_by_pubkey<br/>update_identity_pseudo / _avatar<br/>sign_message"]
+            ID_STORE["Argon2id store<br/>identities (app-data dir)"]
+        end
+
+        subgraph "layout.rs"
+            LO_EVTS["bento:layout:move / resize / swap<br/>(IPC events from frontend)"]
+            LO_STATE["LayoutState<br/>HashMap<id, LayoutWindow>"]
+            LO_DISK["bento_layout.json<br/>(debounced flush)"]
+        end
+
+        subgraph "tls.rs"
+            CERT_PIN["SPKI pinning<br/>PRIMARY_PIN_HASH / BACKUP_PIN_HASH"]
+            HTTP["call_signaling · http_fetch<br/>(reqwest with rustls)"]
+            WS["WebSocket connector<br/>(tauri-plugin-websocket + rustls)"]
+        end
+
+        DSP["get_dsp_token()<br/>CRC32 seal"]
     end
 
-    REACT["Frontend React"] -- "IPC invoke" --> LIB
-    REACT -- "IPC invoke" --> ID
-    REACT -- "Événements Tauri" --> BENTO
-    REACT -- "API plugin" --> WS
-    REACT -- "API plugin" --> UPD
+    subgraph "External"
+        SIG["Signaling server<br/>HTTPS / WSS"]
+    end
+
+    REACT -- "invoke('create_identity')" --> ID_CMDS --> ID_STORE
+    REACT -- "emit('bento:layout:move')" --> LO_EVTS --> LO_STATE
+    LO_STATE -- "emit('bento:layout:update')" --> REACT
+    LO_STATE -- "debounced write" --> LO_DISK
+    REACT -- "invoke('http_fetch' / 'call_signaling')" --> HTTP --> CERT_PIN
+    HTTP --> SIG
+    WS --> SIG
+    REACT -- "invoke('get_dsp_token')" --> DSP --> WORKLET
 ```
 
-## Commandes Tauri
+---
+
+## Tauri commands (IPC)
+
+| Command | Module | Description |
+|---|---|---|
+| `create_identity` | `identity` | Generates an Ed25519 keypair, hashes the password with Argon2id, persists it to the app-data store. |
+| `recover_identity` | `identity` | Re-binds an existing keypair to the local store from an external backup. |
+| `find_identity_by_pubkey` | `identity` | Lookup helper used by the login flow. |
+| `update_identity_pseudo` | `identity` | Mutates the displayed pseudonym for the active identity. |
+| `update_identity_avatar` | `identity` | Mutates the avatar reference. |
+| `sign_message` | `identity` | Signs a host-supplied byte slice with the active Ed25519 secret key. |
+| `call_signaling` | `tls` | Pinned HTTPS POST to the signaling server (auth, friends, presence). |
+| `http_fetch` | `tls` | Generic pinned HTTP fetch for first-party origins. |
+| `get_dsp_token` | `lib` | CRC32 seal used by the AudioWorklet to refuse running outside the trusted native shell. |
+
+The full list is registered in [`src/lib.rs`](./src/lib.rs) inside the `invoke_handler!` macro.
+
+### Bento layout events
+
+The layout state machine listens to events emitted by the frontend (instead of regular `invoke` calls) so that drag/resize loops never serialize a return value:
+
+| Event (frontend → backend) | Payload | Effect |
+|---|---|---|
+| `bento:layout:move` | `MovePayload { id, x, y }` | Translates window `id` to `(x, y)` (percent-based). |
+| `bento:layout:resize` | `ResizePayload { id, w, h }` | Resizes window `id` to `(w, h)`. |
+| `bento:layout:swap` | `SwapPayload { a, b }` | Swaps two windows' positions. |
+| `bento:layout:update` | `LayoutBatch { windows }` | Backend → frontend broadcast after every state change. |
+
+Disk persistence is **debounced**: rapid drag streams batch into a single write to `bento_layout.json` in the app-data directory.
+
+---
+
+## TLS pinning
+
+```mermaid
+sequenceDiagram
+    participant FE as React (WebView)
+    participant TLS as tls.rs
+    participant CV as ServerCertVerifier
+    participant SRV as Signaling server
+
+    FE->>TLS: invoke("call_signaling", url, body)
+    TLS->>SRV: TCP + TLS ClientHello
+    SRV-->>TLS: Certificate chain
+    TLS->>CV: verify chain
+    CV->>CV: SHA-256(SPKI) → base64
+    alt hash matches PRIMARY_PIN or BACKUP_PIN
+        CV-->>TLS: ServerCertVerified
+        TLS->>SRV: encrypted POST
+        SRV-->>TLS: response bytes
+        TLS-->>FE: { status, body }
+    else hash mismatch
+        CV-->>TLS: Error::General("pin mismatch")
+        TLS-->>FE: error
+    end
+```
+
+Hashes are injected at compile time via the `PRIMARY_PIN_HASH` / `BACKUP_PIN_HASH` env variables. When neither is set, the build is flagged via `tls::is_dev_build()` and accepts any cert (development only).
+
+---
+
+## File layout
+
+```
+src-tauri/
+├── Cargo.toml
+├── tauri.conf.json
+├── icons/
+└── src/
+    ├── main.rs        # Binary entry → calls lib::run()
+    ├── lib.rs         # tauri::Builder bootstrap + invoke_handler + DSP seal
+    ├── identity.rs    # Identity store, Argon2id hashing, Ed25519 signing
+    ├── layout.rs      # Bento layout state machine + disk persistence
+    └── tls.rs         # rustls config, SPKI pinning, HTTP/WS clients
+```
+
+---
+
+## Build
+
+```bash
+# Dev (hot reload, opens the WebView and the Vite dev server)
+pnpm tauri dev
+
+# Production bundle (.exe / .dmg / .deb depending on host)
+pnpm tauri build
+```
+
+Compile-time pin injection (production):
+
+```bash
+PRIMARY_PIN_HASH=<base64-spki-hash> \
+BACKUP_PIN_HASH=<base64-spki-hash> \
+  pnpm tauri build
+```
+
+---
+
+## Tests
+
+```bash
+cargo test -p desktop
+```
+
+Inline unit tests live in each module (`identity.rs`, `layout.rs`, `tls.rs`, `lib.rs`). They cover:
+
+- DSP token determinism,
+- layout batch serialization round-trip,
+- identity hashing/verification,
+- pin parsing and `is_dev_build` detection.
+
+---
+
+## API documentation
+
+```bash
+cargo doc -p desktop --no-deps --open
+```
+
+Output: `target/doc/desktop_lib/index.html`.
+
+---
+
+# Void — Backend Natif Tauri (FR)
+
+Coque native de l'application desktop Void, construite avec **Tauri v2**. Prend en charge ce que le frontend React ne peut pas faire en sécurité depuis la WebView :
+
+- **Identité locale** — génération Ed25519, store sur disque protégé par Argon2id, service de signature.
+- **État de layout Bento** — disposition des fenêtres en pourcentages, persistance debouncée, fan-out IPC live.
+- **Sortie TLS / réseau** — clients HTTP+WebSocket épinglés à des empreintes SPKI compilées (pas de downgrade MITM).
+- **Sceau du runtime DSP** — token CRC déterministe que le worklet audio utilise pour refuser de démarrer sans la coque native.
+
+> **Licence :** Business Source License 1.1 (BSL-1.1) — voir [`LICENSE`](../../../LICENSE) à la racine du dépôt.
+
+---
+
+## Pourquoi une coque Rust ?
+
+Mettre ces responsabilités dans la WebView exposerait :
+
+- les clés privées à n'importe quelle dépendance JS compromise,
+- les octets bruts du hash de mot de passe au debugger / aux extensions,
+- les décisions de confiance TLS au store de certificats de la machine (très large sur un poste grand public).
+
+La coque native garde le matériel secret **hors de l'espace d'adressage de la WebView** et n'expose que des commandes IPC signées et bornées au layer React.
+
+---
+
+## Commandes Tauri (IPC)
 
 | Commande | Module | Description |
 |---|---|---|
-| `create_identity` | `identity.rs` | Génère un keypair Ed25519, hash le mot de passe avec Argon2id, persiste sur disque |
-| `find_identity_by_pubkey` | `identity.rs` | Recherche une identité par clé publique |
-| `update_identity_pseudo` | `identity.rs` | Met à jour le pseudo d'une identité stockée |
-| `update_identity_avatar` | `identity.rs` | Met à jour l'avatar d'une identité stockée |
-| `recover_identity` | `identity.rs` | Récupère une identité via pseudo + mot de passe (vérification Argon2id) |
-| `call_signaling` | `lib.rs` | Requête HTTP(S) vers le serveur de signalisation avec certificate pinning TLS |
+| `create_identity` | `identity` | Génère un keypair Ed25519, hash le mot de passe avec Argon2id, persiste dans le store app-data. |
+| `recover_identity` | `identity` | Ré-importe un keypair existant depuis un backup externe. |
+| `find_identity_by_pubkey` | `identity` | Helper de lookup utilisé par le flux de connexion. |
+| `update_identity_pseudo` | `identity` | Met à jour le pseudonyme affiché. |
+| `update_identity_avatar` | `identity` | Met à jour la référence d'avatar. |
+| `sign_message` | `identity` | Signe un slice fourni par le host avec la clé Ed25519 active. |
+| `call_signaling` | `tls` | POST HTTPS épinglé vers le serveur de signalisation. |
+| `http_fetch` | `tls` | Fetch HTTP épinglé générique pour les origines de premier plan. |
+| `get_dsp_token` | `lib` | Sceau CRC32 utilisé par l'AudioWorklet pour refuser de tourner hors de la coque native. |
 
-## Certificate Pinning TLS
+### Événements de layout Bento
 
-L'application embarque l'empreinte SHA-256 du certificat serveur. Toutes les connexions HTTPS/WSS vérifient le certificat distant via une implémentation custom de `rustls::ServerCertVerifier` (`MyVerifier`). Cela empêche les attaques MITM même si une CA est compromise.
+| Événement (frontend → backend) | Payload | Effet |
+|---|---|---|
+| `bento:layout:move` | `MovePayload { id, x, y }` | Translate la fenêtre `id` à `(x, y)` (en pourcentages). |
+| `bento:layout:resize` | `ResizePayload { id, w, h }` | Redimensionne la fenêtre `id` à `(w, h)`. |
+| `bento:layout:swap` | `SwapPayload { a, b }` | Échange la position de deux fenêtres. |
+| `bento:layout:update` | `LayoutBatch { windows }` | Diffusion backend → frontend après chaque mutation. |
 
-## Moteur Bento Layout
+La persistance disque est **debouncée** : un flux rapide de drag est aggloméré en une seule écriture vers `bento_layout.json` dans le répertoire de données de l'application.
 
-Système de layout persistant communiqué au frontend via les événements Tauri :
+---
 
-- **`bento:layout:move`** — Repositionnement par drag de la sidebar
-- **`bento:layout:resize`** — Redimensionnement de la sidebar
-- **`bento:layout:update`** — Synchronisation complète de l'état du layout
+## Pinning TLS
 
-Le layout est persisté dans `layout.json` dans le répertoire de données de l'application.
+Les empreintes SPKI sont injectées à la compilation via les variables `PRIMARY_PIN_HASH` / `BACKUP_PIN_HASH`. Quand aucune n'est définie, le build est marqué via `tls::is_dev_build()` et accepte n'importe quel certificat (dev uniquement).
 
-## Stockage des Identités
-
+```bash
+PRIMARY_PIN_HASH=<base64-spki-hash> \
+BACKUP_PIN_HASH=<base64-spki-hash> \
+  pnpm tauri build
 ```
-<app_data>/
-├── identities/
-│   ├── <pubkey_hex>.secret    # Clé privée chiffrée (Argon2id)
-│   └── <pubkey_hex>.meta      # Métadonnées publiques (pseudo, avatar)
-└── layout.json                # Persistance du Bento layout
+
+---
+
+## Compilation
+
+```bash
+# Dev (hot reload, ouvre la WebView et le serveur Vite)
+pnpm tauri dev
+
+# Bundle de production (.exe / .dmg / .deb selon l'hôte)
+pnpm tauri build
 ```
 
-## Dépendances
+---
 
-| Crate | Rôle |
-|---|---|
-| `tauri` v2 | Framework d'application desktop |
-| `ed25519-dalek` | Génération/signature de keypairs Ed25519 |
-| `argon2` | Hachage de mots de passe Argon2id |
-| `rustls` | TLS avec vérification de certificat custom |
-| `reqwest` | Client HTTP (TLS pinné) |
-| `serde` / `serde_json` | Sérialisation |
+## Tests & documentation
 
-## Licence
+```bash
+cargo test -p desktop
+cargo doc  -p desktop --no-deps --open
+```
 
-**BSL-1.1** — Voir [LICENSE](../../../LICENSE).
+Sortie de la doc : `target/doc/desktop_lib/index.html`.
 

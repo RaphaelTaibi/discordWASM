@@ -62,4 +62,3 @@ fn multiple_tokens_decode_correctly() {
         assert_eq!(claims.sub, uid);
     }
 }
-

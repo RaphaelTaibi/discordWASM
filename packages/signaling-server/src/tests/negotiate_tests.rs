@@ -1,10 +1,10 @@
-use axum::http::{HeaderMap, HeaderValue, header};
 use axum::body::Bytes;
+use axum::http::{HeaderMap, HeaderValue, header};
 use prost::Message;
 
 use crate::models::RegisterBody;
-use crate::negotiate::{accepts_proto, decode_body, negotiate, negotiate_list, Negotiated};
 use crate::models::{StatusResponse, UserSummary, UserSummaryList};
+use crate::negotiate::{Negotiated, accepts_proto, decode_body, negotiate, negotiate_list};
 
 // ---------------------------------------------------------------------------
 // 1. accepts_proto with application/x-protobuf header
@@ -13,7 +13,10 @@ use crate::models::{StatusResponse, UserSummary, UserSummaryList};
 #[test]
 fn accepts_proto_with_proto_header() {
     let mut headers = HeaderMap::new();
-    headers.insert(header::ACCEPT, HeaderValue::from_static("application/x-protobuf"));
+    headers.insert(
+        header::ACCEPT,
+        HeaderValue::from_static("application/x-protobuf"),
+    );
     assert!(accepts_proto(&headers));
 }
 
@@ -45,7 +48,10 @@ fn accepts_proto_with_no_header() {
 #[test]
 fn decode_body_json() {
     let mut headers = HeaderMap::new();
-    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
     let json = serde_json::json!({
         "username": "test",
         "displayName": "Test",
@@ -90,7 +96,10 @@ fn decode_body_protobuf() {
 #[test]
 fn decode_body_invalid_json() {
     let mut headers = HeaderMap::new();
-    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
     let bytes = Bytes::from_static(b"not json");
     let result: Result<RegisterBody, _> = decode_body(&headers, &bytes);
     assert!(result.is_err());
@@ -118,7 +127,9 @@ fn decode_body_invalid_protobuf() {
 
 #[test]
 fn negotiate_json_response() {
-    let data = StatusResponse { status: "ok".into() };
+    let data = StatusResponse {
+        status: "ok".into(),
+    };
     let result = negotiate(data, false);
     assert!(matches!(result, Negotiated::Json(_)));
 }
@@ -129,7 +140,9 @@ fn negotiate_json_response() {
 
 #[test]
 fn negotiate_proto_response() {
-    let data = StatusResponse { status: "ok".into() };
+    let data = StatusResponse {
+        status: "ok".into(),
+    };
     let result = negotiate(data, true);
     match result {
         Negotiated::Proto(bytes) => {
@@ -179,4 +192,3 @@ fn negotiate_list_proto() {
         _ => panic!("expected Proto variant"),
     }
 }
-

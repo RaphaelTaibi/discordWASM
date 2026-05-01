@@ -43,7 +43,9 @@ fn serialize_peer_left() {
 
 #[test]
 fn serialize_error_message() {
-    let msg = ServerMessage::Error { message: "test error".into() };
+    let msg = ServerMessage::Error {
+        message: "test error".into(),
+    };
     let json = serialize_message(&msg).expect("should serialize");
     assert!(json.contains("test error"));
 }
@@ -111,4 +113,3 @@ fn serialize_ice_message() {
     let json = serialize_message(&msg).expect("should serialize");
     assert!(json.contains("ice"));
 }
-

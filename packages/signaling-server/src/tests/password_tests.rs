@@ -65,4 +65,3 @@ fn empty_password_roundtrip() {
     assert!(verify_password("", &hash));
     assert!(!verify_password("non-empty", &hash));
 }
-

@@ -15,7 +15,12 @@ fn deserialize_join() {
     }"#;
     let msg: ClientMessage = serde_json::from_str(json).unwrap();
     match msg {
-        ClientMessage::Join { channel_id, user_id, username, fingerprint } => {
+        ClientMessage::Join {
+            channel_id,
+            user_id,
+            username,
+            fingerprint,
+        } => {
             assert_eq!(channel_id, "ch1");
             assert_eq!(user_id, "u1");
             assert_eq!(username, "Alice");
@@ -79,7 +84,11 @@ fn deserialize_media_state() {
     }"#;
     let msg: ClientMessage = serde_json::from_str(json).unwrap();
     match msg {
-        ClientMessage::MediaState { is_muted, is_deafened, .. } => {
+        ClientMessage::MediaState {
+            is_muted,
+            is_deafened,
+            ..
+        } => {
             assert!(is_muted);
             assert!(!is_deafened);
         }
@@ -99,7 +108,9 @@ fn deserialize_chat() {
     }"#;
     let msg: ClientMessage = serde_json::from_str(json).unwrap();
     match msg {
-        ClientMessage::Chat { message, timestamp, .. } => {
+        ClientMessage::Chat {
+            message, timestamp, ..
+        } => {
             assert_eq!(message, "Hello!");
             assert_eq!(timestamp, 1_700_000_000);
         }
@@ -159,7 +170,9 @@ fn serialize_stats() {
 
 #[test]
 fn serialize_error() {
-    let msg = ServerMessage::Error { message: "something broke".into() };
+    let msg = ServerMessage::Error {
+        message: "something broke".into(),
+    };
     let json = serde_json::to_value(&msg).unwrap();
     assert_eq!(json["type"], "error");
     assert_eq!(json["message"], "something broke");
@@ -208,4 +221,3 @@ fn peer_info_clone_and_serialize() {
     let json = serde_json::to_value(&cloned).unwrap();
     assert_eq!(json["isDeafened"], true);
 }
-

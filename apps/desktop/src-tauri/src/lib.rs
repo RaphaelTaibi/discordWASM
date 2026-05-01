@@ -4,12 +4,11 @@ pub mod tls;
 
 use std::sync::Arc;
 
-use tauri::{Manager, Emitter, Listener};
+use tauri::{Emitter, Listener, Manager};
 
 use layout::{
-    LayoutState, LayoutBatch, MovePayload, ResizePayload, SwapPayload,
-    handle_move, handle_resize, handle_swap,
-    load_layout_from_disk, default_layout, is_legacy_pixel_layout,
+    default_layout, handle_move, handle_resize, handle_swap, is_legacy_pixel_layout,
+    load_layout_from_disk, LayoutBatch, LayoutState, MovePayload, ResizePayload, SwapPayload,
 };
 
 // ---------------------------------------------------------------------------
@@ -41,7 +40,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_websocket::Builder::new().tls_connector(ws_connector).build())
+        .plugin(
+            tauri_plugin_websocket::Builder::new()
+                .tls_connector(ws_connector)
+                .build(),
+        )
         .manage(client)
         .manage(LayoutState::default())
         .invoke_handler(tauri::generate_handler![
@@ -72,7 +75,9 @@ pub fn run() {
                 .unwrap_or_else(default_layout);
             if let Ok(mut windows) = handle.state::<LayoutState>().windows.lock() {
                 *windows = initial;
-                let batch = LayoutBatch { windows: windows.values().cloned().collect() };
+                let batch = LayoutBatch {
+                    windows: windows.values().cloned().collect(),
+                };
                 let _ = handle.emit("bento:layout:update", batch);
             }
 
@@ -123,9 +128,14 @@ mod tests {
     #[test]
     fn layout_batch_serialization() {
         let batch = LayoutBatch {
-            windows: vec![
-                layout::LayoutWindow { id: "a".into(), x: 0.0, y: 0.0, w: 0.5, h: 0.5, z: 1 },
-            ],
+            windows: vec![layout::LayoutWindow {
+                id: "a".into(),
+                x: 0.0,
+                y: 0.0,
+                w: 0.5,
+                h: 0.5,
+                z: 1,
+            }],
         };
         let json = serde_json::to_string(&batch).unwrap();
         assert!(json.contains("\"windows\""));

@@ -1,5 +1,5 @@
 use axum::body::Bytes;
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use prost::Message;
 use serde::Serialize;
@@ -29,11 +29,9 @@ pub fn decode_body<T: serde::de::DeserializeOwned + Message + Default>(
         .is_some_and(|v| v.contains("application/x-protobuf"));
 
     if is_proto {
-        T::decode(bytes.as_ref())
-            .map_err(|e| ApiError::BadRequest(format!("protobuf decode: {e}")))
+        T::decode(bytes.as_ref()).map_err(|e| ApiError::BadRequest(format!("protobuf decode: {e}")))
     } else {
-        serde_json::from_slice(bytes)
-            .map_err(|e| ApiError::BadRequest(format!("json decode: {e}")))
+        serde_json::from_slice(bytes).map_err(|e| ApiError::BadRequest(format!("json decode: {e}")))
     }
 }
 

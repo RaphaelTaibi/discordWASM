@@ -37,7 +37,9 @@ impl FraudDetector {
 
     /// Records a failed login attempt. Returns `true` if the IP should be banned.
     pub fn record_login_fail(&self, ip: &str, bans: &BanStore) -> bool {
-        FRAUD_ATTEMPTS.with_label_values(&["login_bruteforce"]).inc();
+        FRAUD_ATTEMPTS
+            .with_label_values(&["login_bruteforce"])
+            .inc();
         self.check_and_ban(
             &self.login_fails,
             ip,
@@ -89,7 +91,10 @@ impl FraudDetector {
         let deque = entry.value_mut();
 
         // Purge events outside the window
-        while deque.front().is_some_and(|t| now.duration_since(*t) > window) {
+        while deque
+            .front()
+            .is_some_and(|t| now.duration_since(*t) > window)
+        {
             deque.pop_front();
         }
         deque.push_back(now);
@@ -126,4 +131,3 @@ pub fn spawn_cleanup(detector: std::sync::Arc<FraudDetector>) {
         }
     });
 }
-

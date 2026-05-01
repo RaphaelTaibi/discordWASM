@@ -362,11 +362,66 @@ suppressor.process(audioBuffer);
 packages/core-wasm/
 ├── Cargo.toml
 ├── README.md
+├── benches/
+│   └── dsp.rs           # Criterion benchmarks (native target, --features bench)
+├── tests/
 └── src/
     ├── lib.rs          # DSP, video, network functions + SmartGate + TransientSuppressor
     ├── proto.rs         # Protobuf message types (prost derive, synced with server)
     └── codec.rs         # wasm_bindgen encode/decode functions
 ```
+
+---
+
+## Benchmarks (criterion)
+
+The crate ships a [`criterion`](https://github.com/bheisler/criterion.rs) suite that
+profiles the DSP hot paths on the **native** target (criterion cannot run inside
+wasm32). The benches mirror the realistic frame sizes used by the
+`AudioWorkletProcessor` (10 ms / 20 ms @ 48 kHz) and the analyzer worker
+(320×180 RGBA frames).
+
+### Run
+
+```bash
+cargo bench -p core-wasm --features bench
+```
+
+> The `bench` feature exposes a `__bench_compute_seal()` helper so criterion
+> can activate the runtime context and exercise the *real* hot path of
+> `SmartGate::process` / `TransientSuppressor::process` rather than the
+> degraded fallback. This feature **must never** be enabled in production
+> or wasm builds.
+
+### Coverage
+
+| Group | Benchmarks |
+|---|---|
+| `audio_analysis` | `detect_peak`, `rms_volume`, `detect_silence`, `detect_clipping`, `crest_factor`, `dominant_freq` (480 / 960 / 4096 samples) |
+| `audio_fx` | `compress_audio`, `normalize_audio`, `white_noise_960` |
+| `processors` | `smart_gate_manual`, `smart_gate_auto`, `transient_suppressor` |
+| `hash_and_video` | `crc32_hash_4k`, `compute_fingerprint`, `color_histogram_320x180`, `is_frozen_frame_320x180` |
+
+### Indicative results (native x86_64, release)
+
+| Hot path | Frame | Median | Throughput |
+|---|---|---|---|
+| `detect_peak` | 480 | 4.15 ns | ~114 Gelem/s |
+| `rms_volume` | 480 | 380 ns | ~1.26 Gelem/s |
+| `compress_audio` | 960 | 3.77 µs | ~255 Melem/s |
+| `SmartGate.process` (auto) | 960 | 2.08 µs | ~460 Melem/s |
+| `TransientSuppressor.process` | 960 | 2.50 µs | ~384 Melem/s |
+| `crc32_hash` | 4 KiB | 2.69 µs | ~1.41 GiB/s |
+| `color_histogram` | 320×180 | 92.8 µs | ~2.31 GiB/s |
+
+These numbers are reference points only — actual wasm32 throughput in the
+worklet will differ; treat criterion runs as **regression detectors**, not as
+absolute SLA values.
+
+> Note: a real out-of-bounds bug in `dominant_freq` was uncovered while
+> bringing up the benchmark suite (autocorrelation `max_lag` was not clamped
+> to the buffer length, causing a panic on 10 ms WebRTC frames). It has been
+> fixed in `lib.rs` — see commit history.
 
 ---
 
@@ -733,8 +788,67 @@ suppressor.process(audioBuffer);
 packages/core-wasm/
 ├── Cargo.toml
 ├── README.md
+├── benches/
+│   └── dsp.rs           # Benchmarks Criterion (cible native, --features bench)
+├── tests/
 └── src/
     ├── lib.rs          # Fonctions DSP, vidéo, réseau + SmartGate + TransientSuppressor
     ├── proto.rs         # Types protobuf (prost derive, synchronisés avec le serveur)
     └── codec.rs         # Fonctions encode/decode exposées via wasm_bindgen
 ```
+
+---
+
+## Benchmarks (criterion)
+
+Le crate embarque une suite [`criterion`](https://github.com/bheisler/criterion.rs)
+qui profile les chemins critiques DSP sur la cible **native** (criterion ne peut
+pas tourner sous wasm32). Les benches reproduisent les tailles de frames
+réalistes utilisées par l'`AudioWorkletProcessor` (10 ms / 20 ms @ 48 kHz) et
+le worker d'analyse (frames RGBA 320×180).
+
+### Lancement
+
+```bash
+cargo bench -p core-wasm --features bench
+```
+
+> La feature `bench` expose `__bench_compute_seal()` afin que criterion puisse
+> activer le runtime context et exercer le *vrai* hot path de
+> `SmartGate::process` / `TransientSuppressor::process` plutôt que le chemin
+> dégradé de fallback. Cette feature **ne doit jamais** être activée en
+> production ni dans les builds wasm.
+
+### Couverture
+
+| Groupe | Benchmarks |
+|---|---|
+| `audio_analysis` | `detect_peak`, `rms_volume`, `detect_silence`, `detect_clipping`, `crest_factor`, `dominant_freq` (480 / 960 / 4096 échantillons) |
+| `audio_fx` | `compress_audio`, `normalize_audio`, `white_noise_960` |
+| `processors` | `smart_gate_manual`, `smart_gate_auto`, `transient_suppressor` |
+| `hash_and_video` | `crc32_hash_4k`, `compute_fingerprint`, `color_histogram_320x180`, `is_frozen_frame_320x180` |
+
+### Résultats indicatifs (x86_64 natif, release)
+
+| Hot path | Frame | Médiane | Throughput |
+|---|---|---|---|
+| `detect_peak` | 480 | 4.15 ns | ~114 Gelem/s |
+| `rms_volume` | 480 | 380 ns | ~1.26 Gelem/s |
+| `compress_audio` | 960 | 3.77 µs | ~255 Melem/s |
+| `SmartGate.process` (auto) | 960 | 2.08 µs | ~460 Melem/s |
+| `TransientSuppressor.process` | 960 | 2.50 µs | ~384 Melem/s |
+| `crc32_hash` | 4 KiB | 2.69 µs | ~1.41 GiB/s |
+| `color_histogram` | 320×180 | 92.8 µs | ~2.31 GiB/s |
+
+Ces chiffres ne sont que des points de référence — le débit réel sous wasm32
+dans le worklet sera différent ; les runs criterion sont à utiliser comme
+**détecteurs de régression**, pas comme valeurs SLA absolues.
+
+> Note : un vrai bug d'out-of-bounds dans `dominant_freq` a été détecté lors
+> de la mise en place du suite de benchmarks (le `max_lag` de l'autocorrélation
+> n'était pas borné par la longueur du buffer, ce qui causait un panic sur les
+> frames WebRTC de 10 ms). Le correctif est dans `lib.rs` — voir l'historique
+> de commits.
+
+---
+

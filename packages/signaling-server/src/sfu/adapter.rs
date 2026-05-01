@@ -33,9 +33,28 @@ impl WsPeerSink {
 impl SignalSink for WsPeerSink {
     async fn deliver(&self, _peer: &PeerId, message: Outbound) -> SfuResult<()> {
         let server_msg = match message {
-            Outbound::Offer { sdp } => ServerMessage::Offer { sdp },
-            Outbound::Answer { sdp } => ServerMessage::Answer { sdp },
-            Outbound::Ice { candidate } => ServerMessage::Ice { candidate },
+            // void-sfu hands us SDP as a plain `String` (W3C session description
+            // text). The legacy WS contract used a `serde_json::Value` payload
+            // because clients sometimes wrap it in `{ type, sdp }`; we keep the
+            // wire shape backwards-compatible by lifting the string into a
+            // JSON string value.
+            Outbound::Offer { sdp } => ServerMessage::Offer {
+                sdp: serde_json::Value::String(sdp),
+            },
+            Outbound::Answer { sdp } => ServerMessage::Answer {
+                sdp: serde_json::Value::String(sdp),
+            },
+            // `IceCandidate` is exposed as a typed value by void-sfu. We
+            // serialize it to JSON so the existing client code (which expects
+            // an opaque `RTCIceCandidateInit` blob) keeps working unchanged.
+            Outbound::Ice { candidate } => ServerMessage::Ice {
+                candidate: serde_json::json!({
+                    "candidate": candidate.candidate,
+                    "sdpMid": candidate.sdp_mid,
+                    "sdpMLineIndex": candidate.sdp_mline_index,
+                    "usernameFragment": candidate.username_fragment,
+                }),
+            },
             Outbound::TrackMap {
                 source_peer,
                 track_id,
@@ -61,7 +80,7 @@ impl SignalSink for WsPeerSink {
 
 /// Observer that broadcasts room membership transitions as WebSocket
 /// `peer-joined` / `peer-left` messages to all remaining peers.
-pub(crate) struct WsRoomObserver {
+pub struct WsRoomObserver {
     state: Arc<AppState>,
 }
 
@@ -96,6 +115,24 @@ impl RoomObserver for WsRoomObserver {
                 };
                 self.broadcast_excluding(&room, &msg, &peer).await;
             }
+            // Data-channel relay events are useful for richer presence/UX
+            // (e.g. surface "screen-share started" to peers without parsing
+            // SDP), but the current WS protocol has no matching variant. The
+            // handler stays trace-only until the protocol exposes a payload
+            // for it, which keeps the match exhaustive without breaking the
+            // wire format.
+            RoomEvent::DataChannelOpened { room, peer, label } => {
+                debug!(
+                    "DataChannelOpened (room={}, peer={}, label={}) — no WS fan-out yet",
+                    room, peer, label
+                );
+            }
+            RoomEvent::DataChannelClosed { room, peer, label } => {
+                debug!(
+                    "DataChannelClosed (room={}, peer={}, label={}) — no WS fan-out yet",
+                    room, peer, label
+                );
+            }
         }
     }
 }
@@ -107,7 +144,9 @@ impl WsRoomObserver {
         msg: &ServerMessage,
         exclude: &PeerId,
     ) {
-        let Some(payload) = serialize_message(msg) else { return };
+        let Some(payload) = serialize_message(msg) else {
+            return;
+        };
         let members = self.state.sfu.room_members(room);
         let peers = self.state.peers.read().await;
         for member in members {
@@ -135,4 +174,3 @@ impl AppState {
         })
     }
 }
-

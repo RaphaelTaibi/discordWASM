@@ -3,7 +3,6 @@
 /// Each nonce is a UUID v4 string stored with its creation instant.
 /// Nonces are single-use: consumed atomically on first verification.
 /// A background task prunes expired entries every 30 seconds.
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -72,7 +71,8 @@ impl NonceStore {
     /// Removes all entries older than `NONCE_TTL`.
     fn prune(&self) {
         let before = self.inner.len();
-        self.inner.retain(|_, created_at| created_at.elapsed() <= NONCE_TTL);
+        self.inner
+            .retain(|_, created_at| created_at.elapsed() <= NONCE_TTL);
         let removed = before - self.inner.len();
         if removed > 0 {
             tracing::debug!("NonceStore: pruned {} expired nonce(s)", removed);
@@ -99,4 +99,3 @@ pub async fn get_nonce(
     let nonce = store.generate()?;
     Ok(Json(NonceResponse { nonce }))
 }
-

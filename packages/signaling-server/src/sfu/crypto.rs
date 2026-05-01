@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use ed25519_dalek::{Signature, VerifyingKey};
 
 /// Verifies an Ed25519 signature against a public key and message.
@@ -16,8 +16,8 @@ pub fn verify_signature(
         .try_into()
         .map_err(|_| "Public key must be 32 bytes".to_string())?;
 
-    let verifying_key = VerifyingKey::from_bytes(&pk_array)
-        .map_err(|e| format!("invalid public key: {e}"))?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&pk_array).map_err(|e| format!("invalid public key: {e}"))?;
 
     let sig_bytes = general_purpose::STANDARD
         .decode(signature_b64)
@@ -31,6 +31,3 @@ pub fn verify_signature(
 
     Ok(verifying_key.verify_strict(message, &signature).is_ok())
 }
-
-
-

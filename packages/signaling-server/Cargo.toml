@@ -32,7 +32,31 @@ base64 = "0.22"
 async-trait = "0.1"
 void-sfu = { path = "../void-sfu" }
 
+[lib]
+name = "signaling_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "signaling-server"
+path = "src/main.rs"
+
 [dev-dependencies]
 tempfile = "3"
 rand = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
 
+[[bench]]
+name = "auth"
+harness = false
+
+[[bench]]
+name = "codec"
+harness = false
+
+[[bench]]
+name = "prost_store"
+harness = false
+
+[[bench]]
+name = "fraud"
+harness = false

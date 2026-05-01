@@ -1,6 +1,5 @@
 /// Video analysis function tests: analyze_frame, is_black_frame,
 /// is_white_frame, color_histogram, is_frozen_frame.
-
 use core_wasm::*;
 
 // ───────────────────────── analyze_frame ──────────────────────
@@ -8,7 +7,9 @@ use core_wasm::*;
 #[test]
 fn analyze_frame_basic() {
     // 2x2 RGBA frame, all red=128
-    let data = vec![128, 0, 0, 255, 128, 0, 0, 255, 128, 0, 0, 255, 128, 0, 0, 255];
+    let data = vec![
+        128, 0, 0, 255, 128, 0, 0, 255, 128, 0, 0, 255, 128, 0, 0, 255,
+    ];
     let result = analyze_frame(&data, 2, 2);
     assert!(result.contains("2x2"));
     assert!(result.contains("128"));
@@ -76,7 +77,7 @@ fn color_histogram_single_pixel() {
 fn color_histogram_two_identical_pixels() {
     let data = vec![50, 50, 50, 255, 50, 50, 50, 255];
     let hist = color_histogram(&data);
-    assert_eq!(hist[50], 2);       // R
+    assert_eq!(hist[50], 2); // R
     assert_eq!(hist[256 + 50], 2); // G
     assert_eq!(hist[512 + 50], 2); // B
 }
@@ -110,4 +111,3 @@ fn is_frozen_frame_different_lengths() {
     let b = vec![100, 100, 100, 255, 0, 0, 0, 255];
     assert!(!is_frozen_frame(&a, &b, 0));
 }
-

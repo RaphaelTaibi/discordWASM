@@ -54,7 +54,9 @@ fn roundtrip_users_and_friends() {
 
     let u = make_user(1);
     store.users.insert(u.id.clone(), u.clone());
-    store.username_index.insert(u.username.to_lowercase(), u.id.clone());
+    store
+        .username_index
+        .insert(u.username.to_lowercase(), u.id.clone());
 
     let f = make_friend(1, 1, 2);
     store.friends.insert(f.id.clone(), f.clone());
@@ -82,7 +84,9 @@ fn indexes_rebuilt_on_load() {
 
     for i in 0..50 {
         let u = make_user(i);
-        store.username_index.insert(u.username.to_lowercase(), u.id.clone());
+        store
+            .username_index
+            .insert(u.username.to_lowercase(), u.id.clone());
         if let Some(ref pk) = u.public_key {
             store.pubkey_index.insert(pk.clone(), u.id.clone());
         }
@@ -96,7 +100,10 @@ fn indexes_rebuilt_on_load() {
     assert_eq!(reloaded.pubkey_index.len(), 50);
 
     // Verify index pointers
-    let uid = reloaded.username_index.get("user_25").expect("username index");
+    let uid = reloaded
+        .username_index
+        .get("user_25")
+        .expect("username index");
     assert_eq!(uid.value(), "user-25");
 
     let uid_pk = reloaded.pubkey_index.get("pk-25").expect("pubkey index");
@@ -117,7 +124,8 @@ fn concurrent_1000_user_inserts() {
             let s = Arc::clone(&store);
             thread::spawn(move || {
                 let u = make_user(i);
-                s.username_index.insert(u.username.to_lowercase(), u.id.clone());
+                s.username_index
+                    .insert(u.username.to_lowercase(), u.id.clone());
                 if let Some(ref pk) = u.public_key {
                     s.pubkey_index.insert(pk.clone(), u.id.clone());
                 }
@@ -126,7 +134,9 @@ fn concurrent_1000_user_inserts() {
         })
         .collect();
 
-    for h in handles { h.join().expect("join"); }
+    for h in handles {
+        h.join().expect("join");
+    }
 
     assert_eq!(store.users.len(), 1000);
     store.flush().expect("flush");
@@ -196,7 +206,9 @@ fn concurrent_writes_and_flushes() {
         }));
     }
 
-    for h in handles { h.join().expect("join"); }
+    for h in handles {
+        h.join().expect("join");
+    }
     store.flush().expect("final flush");
 
     let raw = std::fs::read(dir.path().join("test_auth.bin")).expect("read");
@@ -218,7 +230,9 @@ fn repeated_flush_reload_consistency() {
         let base = round * 20;
         for i in base..(base + 20) {
             let u = make_user(i);
-            store.username_index.insert(u.username.to_lowercase(), u.id.clone());
+            store
+                .username_index
+                .insert(u.username.to_lowercase(), u.id.clone());
             if let Some(ref pk) = u.public_key {
                 store.pubkey_index.insert(pk.clone(), u.id.clone());
             }
@@ -230,4 +244,3 @@ fn repeated_flush_reload_consistency() {
     let final_store = Store::load(&path);
     assert_eq!(final_store.users.len(), 200, "10 rounds × 20 users");
 }
-

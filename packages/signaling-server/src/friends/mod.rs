@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{delete, get, post};
-use axum::Router;
 
 use crate::auth::middleware::AuthUser;
 use crate::errors::ApiError;
 use crate::models::*;
-use crate::negotiate::{accepts_proto, decode_body, negotiate, negotiate_list, Negotiated};
+use crate::negotiate::{Negotiated, accepts_proto, decode_body, negotiate, negotiate_list};
 use crate::sfu::state::AppState;
 
 pub mod core;
@@ -33,7 +33,11 @@ async fn list_friends(
     let proto = accepts_proto(&headers);
     let auth = AuthUser::from_headers(&headers)?;
     let items = core::list_friends(&state, &auth.user_id);
-    Ok(negotiate_list(items, |items| UserSummaryList { items }, proto))
+    Ok(negotiate_list(
+        items,
+        |items| UserSummaryList { items },
+        proto,
+    ))
 }
 
 async fn send_request(
@@ -55,7 +59,11 @@ async fn list_pending(
     let proto = accepts_proto(&headers);
     let auth = AuthUser::from_headers(&headers)?;
     let items = core::list_pending(&state, &auth.user_id);
-    Ok(negotiate_list(items, |items| PendingRequestList { items }, proto))
+    Ok(negotiate_list(
+        items,
+        |items| PendingRequestList { items },
+        proto,
+    ))
 }
 
 async fn accept_request(

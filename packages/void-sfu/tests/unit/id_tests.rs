@@ -63,4 +63,3 @@ fn media_and_dc_ids_do_not_collide_in_string_form() {
     let dc = DataChannelSourceId::from_peer_and_label(&peer, "events");
     assert_ne!(media.as_str(), dc.as_str());
 }
-

@@ -138,7 +138,6 @@ impl ServerRegistry {
             path: Arc::new(path.to_string()),
         };
 
-
         tracing::info!("ServerRegistry loaded ({} servers)", registry.servers.len());
         registry
     }
@@ -164,7 +163,10 @@ impl ServerRegistry {
 
     /// Adds a member to the secondary index for a given server.
     pub fn index_member(&self, member_pk: &str, server_id: &str) {
-        let mut entry = self.member_index.entry(member_pk.to_string()).or_insert_with(Vec::new);
+        let mut entry = self
+            .member_index
+            .entry(member_pk.to_string())
+            .or_insert_with(Vec::new);
         if !entry.contains(&server_id.to_string()) {
             entry.push(server_id.to_string());
         }
@@ -196,7 +198,11 @@ impl ServerRegistry {
         }
         std::fs::rename(&tmp, path).map_err(|e| format!("rename: {e}"))?;
 
-        tracing::info!("ServerRegistry flushed ({} bytes, {} servers)", buf.len(), self.servers.len());
+        tracing::info!(
+            "ServerRegistry flushed ({} bytes, {} servers)",
+            buf.len(),
+            self.servers.len()
+        );
         Ok(())
     }
 
@@ -223,4 +229,3 @@ pub fn spawn_flusher(registry: ServerRegistry) {
         }
     });
 }
-

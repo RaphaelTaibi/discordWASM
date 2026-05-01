@@ -1,29 +1,30 @@
-name: CI
-
+﻿name: CI
 on:
   pull_request:
     branches: [main]
-
+  push:
+    branches: [main]
 env:
   RUST_TOOLCHAIN: stable
-
 jobs:
-  rust-tests:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Rust workspace: format check, clippy, full test suite (all 4 crates).
+  # ─────────────────────────────────────────────────────────────────────────
+  rust:
+    name: Rust (fmt + clippy + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-
-      - name: Install Linux dependencies
+          components: clippy, rustfmt
+      - name: Install Linux dependencies (Tauri WebKit)
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Cache Cargo registry
+      - name: Cache Cargo registry & target
         uses: actions/cache@v4
         with:
           path: |
@@ -33,34 +34,75 @@ jobs:
           key: ${{ runner.os }}-cargo-ci-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-ci-
-
-      - name: Run signaling-server tests
-        run: cargo test -p signaling-server --verbose
-
-      - name: Run core-wasm tests
-        run: cargo test -p core-wasm --verbose
-
-      - name: Run desktop tests
-        run: cargo test -p desktop --verbose
-
-  frontend-tests:
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy (workspace, all targets)
+        # Non-fatal for now: clippy already runs locally and we surface its
+        # output without blocking the pipeline. Promote to `-D warnings`
+        # after the existing stylistic warnings are cleaned up.
+        run: cargo clippy --workspace --all-targets
+      - name: cargo test (whole workspace)
+        run: cargo test --workspace --verbose
+  # ─────────────────────────────────────────────────────────────────────────
+  # Frontend: TS type-check, Vitest suite.
+  # ─────────────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend (tsc + Vitest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-
+      - name: Get pnpm store dir
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
       - name: Install dependencies
-        run: pnpm install
-
-      - name: Run frontend tests (Vitest)
-        run: pnpm --filter desktop test:run
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript type-check
+        working-directory: apps/desktop
+        run: pnpm exec tsc --noEmit
+      - name: Vitest (non-interactive)
+        working-directory: apps/desktop
+        run: pnpm test --run
+  # ─────────────────────────────────────────────────────────────────────────
+  # WASM build (sanity-check that core-wasm still compiles for the browser).
+  # ─────────────────────────────────────────────────────────────────────────
+  wasm:
+    name: core-wasm (wasm32 build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain (with wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Cache Cargo (wasm)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+      - name: Build core-wasm
+        working-directory: packages/core-wasm
+        run: wasm-pack build --target web --out-dir ../../apps/desktop/src/pkg
 

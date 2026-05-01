@@ -231,8 +231,11 @@ impl BanStore {
         let bans: Vec<BanRecord> = self.entries.iter().map(|r| r.value().clone()).collect();
         let recidivism: Vec<RecidivismRecord> =
             self.recidivism.iter().map(|r| r.value().clone()).collect();
-        let fingerprints: Vec<FingerprintRecord> =
-            self.fingerprints.iter().map(|r| r.value().clone()).collect();
+        let fingerprints: Vec<FingerprintRecord> = self
+            .fingerprints
+            .iter()
+            .map(|r| r.value().clone())
+            .collect();
         let snap = BanSnapshot {
             bans,
             recidivism,
@@ -275,4 +278,3 @@ fn epoch_ms() -> i64 {
         .unwrap_or_default()
         .as_millis() as i64
 }
-

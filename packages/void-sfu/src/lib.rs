@@ -79,3 +79,13 @@ pub use room::RoomPeer;
 pub use sfu::{JoinSnapshot, Sfu};
 pub use signal::{Outbound, RoomEvent, RoomObserver, SignalSink};
 pub use stats::ForwardingStats;
+
+/// Bench-only re-exports. Enabled with `--features bench`.
+/// Never use these in production code; they expose internal types whose
+/// API is not covered by semver.
+#[cfg(feature = "bench")]
+#[doc(hidden)]
+pub mod __bench_jitter {
+    pub use crate::jitter::JitterBuffer;
+}
+

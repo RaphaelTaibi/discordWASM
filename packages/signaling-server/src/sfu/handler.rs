@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::ConnectInfo;
-use axum::response::IntoResponse;
 use axum::Extension;
+use axum::extract::ConnectInfo;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
@@ -14,7 +14,7 @@ use super::adapter::WsPeerSink;
 use super::broadcast::{broadcast_to_channel, remove_peer, serialize_message};
 use super::models::{ClientMessage, PeerInfo, ServerMessage};
 use super::rpc as ws_rpc;
-use super::state::{AppState, ChatEntry, PeerSession, WS_CHANNEL_CAPACITY, CHAT_HISTORY_CAP};
+use super::state::{AppState, CHAT_HISTORY_CAP, ChatEntry, PeerSession, WS_CHANNEL_CAPACITY};
 use super::subscriptions::{push_to_channel_subscribers, push_to_server_subscribers};
 use crate::auth::jwt;
 use crate::fraud::FraudState;
@@ -93,7 +93,8 @@ async fn handle_socket(
             ClientMessage::Offer { sdp } => {
                 if let Some(uid) = current_user_id.as_deref() {
                     let pid = PeerId::from(uid);
-                    if let Err(e) = state.sfu.handle_offer(&pid, sdp).await {
+                    let sdp_str = extract_sdp(&sdp);
+                    if let Err(e) = state.sfu.handle_offer(&pid, sdp_str).await {
                         warn!("sfu.handle_offer({}): {:?}", uid, e);
                     }
                 }
@@ -102,7 +103,8 @@ async fn handle_socket(
             ClientMessage::Answer { sdp } => {
                 if let Some(uid) = current_user_id.as_deref() {
                     let pid = PeerId::from(uid);
-                    if let Err(e) = state.sfu.handle_answer(&pid, sdp).await {
+                    let sdp_str = extract_sdp(&sdp);
+                    if let Err(e) = state.sfu.handle_answer(&pid, sdp_str).await {
                         debug!("sfu.handle_answer({}): {:?}", uid, e);
                     }
                 }
@@ -111,8 +113,15 @@ async fn handle_socket(
             ClientMessage::Ice { candidate } => {
                 if let Some(uid) = current_user_id.as_deref() {
                     let pid = PeerId::from(uid);
-                    if let Err(e) = state.sfu.handle_ice(&pid, candidate).await {
-                        debug!("sfu.handle_ice({}): {:?}", uid, e);
+                    match parse_ice_candidate(&candidate) {
+                        Some(ice) => {
+                            if let Err(e) = state.sfu.handle_ice(&pid, ice).await {
+                                debug!("sfu.handle_ice({}): {:?}", uid, e);
+                            }
+                        }
+                        None => {
+                            debug!("sfu.handle_ice({}): malformed ICE payload", uid);
+                        }
                     }
                 }
             }
@@ -160,9 +169,9 @@ async fn handle_socket(
 
                 {
                     let mut history = state.chat_history.write().await;
-                    let buf = history
-                        .entry(channel_id.clone())
-                        .or_insert_with(|| std::collections::VecDeque::with_capacity(CHAT_HISTORY_CAP));
+                    let buf = history.entry(channel_id.clone()).or_insert_with(|| {
+                        std::collections::VecDeque::with_capacity(CHAT_HISTORY_CAP)
+                    });
                     if buf.len() >= CHAT_HISTORY_CAP {
                         buf.pop_front();
                     }
@@ -381,4 +390,45 @@ async fn handle_join(
 
 fn sfu_knows_peer(state: &Arc<AppState>, peer_id: &PeerId) -> bool {
     state.sfu.peer_room(peer_id).is_some()
+}
+
+/// Coerces an inbound SDP payload (`serde_json::Value`) into the plain
+/// session description string that void-sfu expects. Browsers wrap their
+/// SDP in `{ "type": "offer", "sdp": "..." }` whereas the legacy native
+/// client sometimes sends the raw string. Both shapes are accepted.
+fn extract_sdp(value: &serde_json::Value) -> &str {
+    if let Some(s) = value.as_str() {
+        return s;
+    }
+    if let Some(obj) = value.as_object() {
+        if let Some(sdp) = obj.get("sdp").and_then(|v| v.as_str()) {
+            return sdp;
+        }
+    }
+    ""
+}
+
+/// Decodes an inbound ICE payload (`RTCIceCandidateInit`-shaped JSON) into
+/// the typed [`void_sfu::IceCandidate`]. Returns `None` when the payload
+/// does not carry the mandatory `candidate` attribute string.
+fn parse_ice_candidate(value: &serde_json::Value) -> Option<void_sfu::IceCandidate> {
+    let candidate = value.get("candidate").and_then(|v| v.as_str())?.to_string();
+    let sdp_mid = value
+        .get("sdpMid")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let sdp_mline_index = value
+        .get("sdpMLineIndex")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u16);
+    let username_fragment = value
+        .get("usernameFragment")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    Some(void_sfu::IceCandidate {
+        candidate,
+        sdp_mid,
+        sdp_mline_index,
+        username_fragment,
+    })
 }

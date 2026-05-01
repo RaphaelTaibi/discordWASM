@@ -1,4 +1,4 @@
- use std::sync::Arc;
+﻿use std::sync::Arc;
 use std::thread;
 
 use dashmap::DashMap;
@@ -83,7 +83,7 @@ fn roundtrip_flush_reload() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Recidivism escalation: 3 bans in window → permanent
+// 5. Recidivism escalation: 3 bans in window â†’ permanent
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -97,7 +97,10 @@ fn recidivism_escalation_to_permanent() {
     store.ban("9.9.9.9".into(), "strike3".into(), 10_000);
 
     let record = store.entries.get("9.9.9.9").expect("record");
-    assert_eq!(record.expires_at_ms, 0, "3rd strike must escalate to permanent");
+    assert_eq!(
+        record.expires_at_ms, 0,
+        "3rd strike must escalate to permanent"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +122,9 @@ fn concurrent_1000_bans() {
         })
         .collect();
 
-    for h in handles { h.join().expect("join"); }
+    for h in handles {
+        h.join().expect("join");
+    }
     assert_eq!(store.entries.len(), 1000);
 
     store.flush().expect("flush");
@@ -144,7 +149,7 @@ fn no_leftover_tmp_after_flush() {
 }
 
 // ---------------------------------------------------------------------------
-// 8. Load nonexistent file → empty store
+// 8. Load nonexistent file â†’ empty store
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -155,7 +160,7 @@ fn load_nonexistent_yields_empty() {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Fingerprint abuse: 50+ IPs on same fingerprint → all permanently banned
+// 9. Fingerprint abuse: 50+ IPs on same fingerprint â†’ all permanently banned
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -178,4 +183,3 @@ fn fingerprint_abuse_mass_ban() {
         assert!(store.is_banned(&ip), "{ip} must be permanently banned");
     }
 }
-

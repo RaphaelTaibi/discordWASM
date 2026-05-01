@@ -1,13 +1,19 @@
 /// Layout engine pure-logic tests.
 /// Validates clamping, fraction-based moves, resizes, and default layout.
-
 use desktop_lib::layout::*;
 
 // ───────────────────────── LayoutWindow ──────────────────────
 
 #[test]
 fn layout_window_serialization_roundtrip() {
-    let win = LayoutWindow { id: "test".into(), x: 0.1, y: 0.2, w: 0.3, h: 0.4, z: 5 };
+    let win = LayoutWindow {
+        id: "test".into(),
+        x: 0.1,
+        y: 0.2,
+        w: 0.3,
+        h: 0.4,
+        z: 5,
+    };
     let json = serde_json::to_string(&win).unwrap();
     let decoded: LayoutWindow = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded.id, "test");
@@ -18,7 +24,14 @@ fn layout_window_serialization_roundtrip() {
 
 #[test]
 fn layout_window_zero_position() {
-    let win = LayoutWindow { id: "origin".into(), x: 0.0, y: 0.0, w: 0.5, h: 0.5, z: 0 };
+    let win = LayoutWindow {
+        id: "origin".into(),
+        x: 0.0,
+        y: 0.0,
+        w: 0.5,
+        h: 0.5,
+        z: 0,
+    };
     let json = serde_json::to_string(&win).unwrap();
     let decoded: LayoutWindow = serde_json::from_str(&json).unwrap();
     assert!((decoded.x).abs() < f64::EPSILON);
@@ -27,20 +40,41 @@ fn layout_window_zero_position() {
 
 #[test]
 fn layout_window_full_container() {
-    let win = LayoutWindow { id: "full".into(), x: 0.0, y: 0.0, w: 1.0, h: 1.0, z: 0 };
+    let win = LayoutWindow {
+        id: "full".into(),
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+        z: 0,
+    };
     assert!((win.w - 1.0).abs() < f64::EPSILON);
     assert!((win.h - 1.0).abs() < f64::EPSILON);
 }
 
 #[test]
 fn layout_window_negative_z_order() {
-    let win = LayoutWindow { id: "bg".into(), x: 0.0, y: 0.0, w: 1.0, h: 1.0, z: -10 };
+    let win = LayoutWindow {
+        id: "bg".into(),
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+        z: -10,
+    };
     assert_eq!(win.z, -10);
 }
 
 #[test]
 fn layout_window_clone_independence() {
-    let win = LayoutWindow { id: "src".into(), x: 0.1, y: 0.2, w: 0.3, h: 0.4, z: 5 };
+    let win = LayoutWindow {
+        id: "src".into(),
+        x: 0.1,
+        y: 0.2,
+        w: 0.3,
+        h: 0.4,
+        z: 5,
+    };
     let mut cloned = win.clone();
     cloned.x = 0.9;
     cloned.id = "cloned".into();
@@ -123,9 +157,17 @@ fn layout_state_insert_and_read() {
     let state = LayoutState::default();
     {
         let mut map = state.windows.lock().unwrap();
-        map.insert("test".into(), LayoutWindow {
-            id: "test".into(), x: 0.1, y: 0.2, w: 0.3, h: 0.4, z: 1,
-        });
+        map.insert(
+            "test".into(),
+            LayoutWindow {
+                id: "test".into(),
+                x: 0.1,
+                y: 0.2,
+                w: 0.3,
+                h: 0.4,
+                z: 1,
+            },
+        );
     }
     let map = state.windows.lock().unwrap();
     assert_eq!(map.len(), 1);
@@ -136,8 +178,28 @@ fn layout_state_insert_and_read() {
 fn layout_state_overwrite_existing() {
     let state = LayoutState::default();
     let mut map = state.windows.lock().unwrap();
-    map.insert("w".into(), LayoutWindow { id: "w".into(), x: 0.0, y: 0.0, w: 0.5, h: 0.5, z: 0 });
-    map.insert("w".into(), LayoutWindow { id: "w".into(), x: 0.9, y: 0.9, w: 0.1, h: 0.1, z: 99 });
+    map.insert(
+        "w".into(),
+        LayoutWindow {
+            id: "w".into(),
+            x: 0.0,
+            y: 0.0,
+            w: 0.5,
+            h: 0.5,
+            z: 0,
+        },
+    );
+    map.insert(
+        "w".into(),
+        LayoutWindow {
+            id: "w".into(),
+            x: 0.9,
+            y: 0.9,
+            w: 0.1,
+            h: 0.1,
+            z: 99,
+        },
+    );
     assert_eq!(map.len(), 1);
     assert_eq!(map.get("w").unwrap().z, 99);
 }
@@ -146,9 +208,15 @@ fn layout_state_overwrite_existing() {
 
 #[test]
 fn layout_window_all_fields_accessible() {
-    let w = LayoutWindow { id: "a".into(), x: 0.0, y: 0.0, w: 1.0, h: 1.0, z: 99 };
+    let w = LayoutWindow {
+        id: "a".into(),
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+        z: 99,
+    };
     assert_eq!(w.id, "a");
     assert_eq!(w.z, 99);
     assert!((w.w - 1.0).abs() < f64::EPSILON);
 }
-

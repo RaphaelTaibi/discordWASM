@@ -157,7 +157,10 @@ fn window_reset_after_ban() {
     let not_triggered = detector.record_login_fail("10.0.0.6", &bans);
     // Already banned so the ban call is cumulative — the return value
     // just tells us if the threshold was hit *this time*.
-    assert!(!not_triggered, "single event after reset should not re-trigger");
+    assert!(
+        !not_triggered,
+        "single event after reset should not re-trigger"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -188,4 +191,3 @@ fn concurrent_recording_no_panic() {
     }
     // No panic = success
 }
-

@@ -1,5 +1,9 @@
 # `void-sfu` test layout
 
+> See the package-level [`../README.md`](../README.md) for the architectural
+> overview, public API tour and design rationale. This file only documents
+> the **test layout** of the crate.
+
 Tests live in this directory (per repository convention) and are split by
 **purpose** so it stays trivial to find what is exercised where.
 

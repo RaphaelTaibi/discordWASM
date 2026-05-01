@@ -37,7 +37,8 @@ impl DataChannelInterceptor for NoopDc {}
 #[test]
 fn empty_interceptor_impls_compile_and_register_into_config() {
     let mut cfg = SfuConfig::default();
-    cfg.interceptors.push(Arc::new(NoopRtp) as Arc<dyn PacketInterceptor>);
+    cfg.interceptors
+        .push(Arc::new(NoopRtp) as Arc<dyn PacketInterceptor>);
     cfg.dc_interceptors
         .push(Arc::new(NoopDc) as Arc<dyn DataChannelInterceptor>);
     cfg.codec_policy = Some(Arc::new(AllowAll) as Arc<dyn CodecPolicy>);
@@ -57,4 +58,3 @@ fn data_channel_outcome_variants_are_publicly_constructible() {
         data: bytes::Bytes::from_static(b"ok"),
     };
 }
-
