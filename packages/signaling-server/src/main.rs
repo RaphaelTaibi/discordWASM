@@ -23,6 +23,7 @@ use rustls::crypto::aws_lc_rs;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use void_sfu::{Sfu, SfuConfig};
 use webrtc::api::APIBuilder;
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::MediaEngine;
@@ -30,9 +31,11 @@ use webrtc::api::setting_engine::SettingEngine;
 use webrtc::ice::udp_network::{EphemeralUDP, UDPNetwork};
 use webrtc::interceptor::registry::Registry as InterceptorRegistry;
 
+use sfu::adapter::WsRoomObserver;
 use sfu::handler::ws_handler;
 use sfu::registry::ServerRegistry;
 use sfu::state::AppState;
+use sfu::subscriptions::Subscriptions;
 
 #[tokio::main]
 async fn main() {
@@ -52,7 +55,15 @@ async fn main() {
     tracing_subscriber::fmt::init();
     metrics::init_uptime();
 
-    let api = build_webrtc_api();
+    let api = match build_webrtc_api() {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("Failed to build WebRTC API: {:?}", e);
+            std::process::exit(1);
+        }
+    };
+    let sfu = Sfu::with_api(SfuConfig::default(), api);
+
     let auth_store = store::Store::load("auth_store.bin");
     store::spawn_flusher(auth_store.clone());
 
@@ -62,15 +73,18 @@ async fn main() {
 
     let app_state = Arc::new(AppState {
         peers: RwLock::new(HashMap::new()),
-        channels: RwLock::new(HashMap::new()),
         chat_history: RwLock::new(HashMap::new()),
         server_registry,
-        api,
+        sfu: sfu.clone(),
         auth_store: auth_store.clone(),
+        subscriptions: Subscriptions::new(),
     });
 
-    metrics::spawn_stats_broadcaster(Arc::clone(&app_state));
+    // Wire the SFU's room-event observer to broadcast peer-joined / peer-left
+    // messages to remaining members.
+    sfu.set_observer(Arc::new(WsRoomObserver::new(Arc::clone(&app_state))));
 
+    metrics::spawn_stats_broadcaster(Arc::clone(&app_state));
 
     // Fraud detection subsystem
     let ban_store = fraud::store::BanStore::load("ban_store.bin");
@@ -118,56 +132,79 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 
-    let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+    let addr: SocketAddr = match format!("0.0.0.0:{}", port).parse() {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("Invalid bind address: {:?}", e);
+            std::process::exit(1);
+        }
+    };
 
     if is_dev {
         println!(
             "🔧 DEV MODE: SFU Server running on http://{} | UDP Range: 10000-20000",
             addr
         );
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(
+        let listener = match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Bind failed: {:?}", e);
+                std::process::exit(1);
+            }
+        };
+        if let Err(e) = axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await
-        .unwrap();
+        {
+            eprintln!("Server error: {:?}", e);
+            std::process::exit(1);
+        }
     } else {
-        let tls_config = RustlsConfig::from_pem_file(
+        let tls_config = match RustlsConfig::from_pem_file(
             PathBuf::from("cert.pem"),
             PathBuf::from("key.pem"),
         )
         .await
-        .expect("Failed to find cert.pem or key.pem");
+        {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to load cert.pem/key.pem: {:?}", e);
+                std::process::exit(1);
+            }
+        };
 
         println!(
             "PROD MODE: SFU Server running on https://{} | UDP Range: 10000-20000",
             addr
         );
-        axum_server::bind_rustls(addr, tls_config)
+        if let Err(e) = axum_server::bind_rustls(addr, tls_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await
-            .unwrap();
+        {
+            eprintln!("Server error: {:?}", e);
+            std::process::exit(1);
+        }
     }
 }
 
-/// Builds the shared WebRTC API with default codecs and UDP port range.
-fn build_webrtc_api() -> webrtc::api::API {
+/// Builds a webrtc-rs `API` with default codecs, default interceptors,
+/// and an ephemeral UDP port range of 10000..=20000.
+fn build_webrtc_api() -> Result<webrtc::api::API, webrtc::Error> {
     let mut m = MediaEngine::default();
-    m.register_default_codecs()
-        .expect("Failed to register codecs");
+    m.register_default_codecs()?;
 
     let mut setting_engine = SettingEngine::default();
-    let ephemeral_udp = EphemeralUDP::new(10000, 20000).expect("Failed to set port range");
+    let ephemeral_udp = EphemeralUDP::new(10000, 20000)?;
     setting_engine.set_udp_network(UDPNetwork::Ephemeral(ephemeral_udp));
 
     let mut registry = InterceptorRegistry::default();
-    registry =
-        register_default_interceptors(registry, &mut m).expect("Failed to register interceptors");
+    registry = register_default_interceptors(registry, &mut m)?;
 
-    APIBuilder::new()
+    Ok(APIBuilder::new()
         .with_media_engine(m)
         .with_interceptor_registry(registry)
         .with_setting_engine(setting_engine)
-        .build()
+        .build())
 }

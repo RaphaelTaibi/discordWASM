@@ -1,4 +1,5 @@
 import VoicePeer from '../models/voice/voicePeer.model';
+import { UserSummary } from '../models/auth/serverAuth.model';
 import { FriendEventPayload } from '../models/social/friendEventPayload.model';
 
 export type ServerSignal =
@@ -13,5 +14,10 @@ export type ServerSignal =
     | { type: 'chat'; channelId: string; from: string; username: string; message: string; timestamp: number }
     | { type: 'stats'; userId: string; bandwidthBps: number }
     | { type: 'error'; message: string }
+    // ---- Phase 3 push events ----
+    | { type: 'authenticated'; userId: string; ok: boolean }
+    | { type: 'server-member-presence'; serverId: string; userId: string; online: boolean }
+    | { type: 'server-member-added'; serverId: string; member: UserSummary }
+    | { type: 'server-member-removed'; serverId: string; userId: string }
+    | { type: 'rpc-result'; requestId: string; result?: unknown; error?: { code: string; message: string } }
     | FriendEventPayload;
-

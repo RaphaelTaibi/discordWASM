@@ -127,98 +127,65 @@ pub fn init_uptime() {
 
 /// Exposes Prometheus-compatible metrics.
 pub async fn handler(state: axum::extract::State<Arc<AppState>>) -> String {
-    let peers = state.peers.read().await;
-    let channels = state.channels.read().await;
+    let snapshot = state.sfu.metrics_snapshot().await;
 
-    // Core gauges
-    ACTIVE_PEERS.set(peers.len() as i64);
-    ACTIVE_CHANNELS.set(channels.len() as i64);
+    ACTIVE_PEERS.set(snapshot.peer_count as i64);
+    ACTIVE_CHANNELS.set(snapshot.room_count as i64);
+    PEER_CONNECTIONS.set(snapshot.peer_connections as i64);
+    FORWARDERS.set(snapshot.total_forwarders as i64);
+    DESTINATION_TRACKS.set(snapshot.total_dest_tracks as i64);
 
-    // Peer connections (peers with an active RTCPeerConnection)
-    let pc_count = peers.values().filter(|p| p.peer_connection.is_some()).count();
-    PEER_CONNECTIONS.set(pc_count as i64);
-
-    // Bandwidth
-    let mut total_bandwidth: u64 = 0;
-    let mut total_forwarders: i64 = 0;
-    let mut total_dest_tracks: i64 = 0;
-
-    for channel in channels.values() {
-        for stats in channel.stats.values() {
-            total_bandwidth += stats.bandwidth_bps();
-        }
-        total_forwarders += channel.forwarders.len() as i64;
-        for fwd in channel.forwarders.values() {
-            total_dest_tracks += fwd.destination_tracks.try_read()
-                .map(|dt| dt.len() as i64)
-                .unwrap_or(0);
-        }
-        MEMBERS_PER_CHANNEL.observe(channel.members.len() as f64);
-    }
+    let total_bandwidth: u64 = snapshot.peer_bandwidths.iter().map(|(_, b)| *b).sum();
     BANDWIDTH_EGRESS.set(total_bandwidth as i64);
     BANDWIDTH_INGRESS.set(total_bandwidth as i64);
-    FORWARDERS.set(total_forwarders);
-    DESTINATION_TRACKS.set(total_dest_tracks);
 
-    // Release locks before reading stores
-    drop(peers);
-    drop(channels);
+    for count in &snapshot.members_per_room {
+        MEMBERS_PER_CHANNEL.observe(*count as f64);
+    }
 
-    // Store / registry gauges
     REGISTERED_USERS.set(state.auth_store.users.len() as i64);
     REGISTERED_SERVERS.set(state.server_registry.servers.len() as i64);
     UPTIME_SECONDS.set(START_TIME.elapsed().as_secs() as i64);
 
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
-    encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
-    String::from_utf8(buffer).unwrap()
+    if let Err(e) = encoder.encode(&prometheus::gather(), &mut buffer) {
+        tracing::warn!("metrics encode failed: {:?}", e);
+        return String::new();
+    }
+    String::from_utf8(buffer).unwrap_or_default()
 }
 
 // ---------------------------------------------------------------------------
 // Background stats broadcaster (runs every 2 s)
 // ---------------------------------------------------------------------------
 
-/// Spawns a periodic task that pushes bandwidth stats to each connected peer.
-/// Phase 1 collects stats under channels read lock, Phase 2 sends under
-/// peers read lock — no nested locks, no write locks required.
+/// Spawns a periodic task that pushes per-peer bandwidth stats over WS.
 pub fn spawn_stats_broadcaster(state: Arc<AppState>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(2));
         loop {
             interval.tick().await;
 
-            // Phase 1: collect stats (channels read lock only)
-            let (stats_list, total_packets) = {
-                let channels = state.channels.read().await;
-                let mut total_packets = 0u64;
-                let mut collected = Vec::new();
-                for channel in channels.values() {
-                    for (user_id, stats) in channel.stats.iter() {
-                        total_packets += stats.packets_sent;
-                        collected.push((
-                            user_id.clone(),
-                            ServerMessage::Stats {
-                                user_id: user_id.clone(),
-                                bandwidth_bps: stats.bandwidth_bps(),
-                            },
-                        ));
-                    }
-                }
-                (collected, total_packets)
-            };
-
+            let snapshot = state.sfu.metrics_snapshot().await;
+            let total_packets: u64 = 0; // packets/s gauge moved to per-forwarder logging
             PACKETS_PER_SEC.observe(total_packets as f64);
 
-            // Phase 2: send to peers (peers read lock, single acquisition)
-            if !stats_list.is_empty() {
-                let peers = state.peers.read().await;
-                for (user_id, msg) in stats_list {
-                    if let Some(peer) = peers.get(&user_id) {
-                        if let Some(payload) = serialize_message(&msg) {
-                            if peer.tx.try_send(payload).is_err() {
-                                WS_QUEUE_DROPPED.inc();
-                            }
+            if snapshot.peer_bandwidths.is_empty() {
+                continue;
+            }
+
+            let peers = state.peers.read().await;
+            for (peer_id, bps) in snapshot.peer_bandwidths {
+                let user_id = peer_id.to_string();
+                if let Some(peer) = peers.get(&user_id) {
+                    let msg = ServerMessage::Stats {
+                        user_id: user_id.clone(),
+                        bandwidth_bps: bps,
+                    };
+                    if let Some(payload) = serialize_message(&msg) {
+                        if peer.tx.try_send(payload).is_err() {
+                            WS_QUEUE_DROPPED.inc();
                         }
                     }
                 }

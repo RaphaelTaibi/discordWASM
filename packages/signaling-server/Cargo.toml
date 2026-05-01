@@ -29,6 +29,8 @@ jsonwebtoken = "9"
 argon2 = "0.5"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 base64 = "0.22"
+async-trait = "0.1"
+void-sfu = { path = "../void-sfu" }
 
 [dev-dependencies]
 tempfile = "3"

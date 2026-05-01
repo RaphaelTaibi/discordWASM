@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use void_sfu::{PeerId, RoomId};
+
 use super::models::ServerMessage;
 use super::state::AppState;
 use crate::metrics::WS_QUEUE_DROPPED;
@@ -24,7 +26,11 @@ pub async fn notify_user(state: &Arc<AppState>, user_id: &str, message: &ServerM
     }
 }
 
-/// Broadcasts a JSON payload to every member of a channel.
+/// Broadcasts a JSON payload to every member of a (voice) channel.
+///
+/// Membership is queried from the SFU room state — the host no longer keeps
+/// its own mirror. For text-channel broadcasts (no SFU room), use the
+/// dedicated text subscribers map (introduced in phase 3).
 pub async fn broadcast_to_channel(
     state: &Arc<AppState>,
     channel_id: &str,
@@ -35,19 +41,19 @@ pub async fn broadcast_to_channel(
         Some(p) => p,
         None => return,
     };
-    let members = {
-        let channels = state.channels.read().await;
-        channels
-            .get(channel_id)
-            .map(|c| c.members.clone())
-            .unwrap_or_default()
-    };
+
+    let room_id = RoomId::from(channel_id);
+    let members = state.sfu.room_members(&room_id);
+    if members.is_empty() {
+        return;
+    }
+
     let peers = state.peers.read().await;
     for member in members {
         if exclude == Some(member.as_str()) {
             continue;
         }
-        if let Some(peer) = peers.get(&member) {
+        if let Some(peer) = peers.get(member.as_str()) {
             if peer.tx.try_send(payload.clone()).is_err() {
                 WS_QUEUE_DROPPED.inc();
             }
@@ -55,57 +61,13 @@ pub async fn broadcast_to_channel(
     }
 }
 
-/// Cleans up a peer: closes its PeerConnection, removes forwarders,
-/// destination tracks, channel membership, and notifies remaining peers.
+/// Cleans up a peer: instructs the SFU to remove it (which closes its PC,
+/// drops forwarders and notifies the room observer), then removes the
+/// host-side metadata. Idempotent.
 pub async fn remove_peer(state: &Arc<AppState>, user_id: &str) {
-    let channel_id = {
-        let peers = state.peers.read().await;
-        peers
-            .get(user_id)
-            .map(|p| p.channel_id.clone())
-            .unwrap_or_default()
-    };
-
-    let removed = {
-        let mut peers = state.peers.write().await;
-        peers.remove(user_id)
-    };
-
-    if let Some(peer) = removed {
-        if let Some(pc) = peer.peer_connection {
-            let _ = pc.close().await;
-        }
-
-        {
-            let mut channels = state.channels.write().await;
-            if let Some(channel) = channels.get_mut(&channel_id) {
-                channel
-                    .forwarders
-                    .retain(|_, f| f.source_user_id != user_id);
-                for forwarder in channel.forwarders.values() {
-                    forwarder.destination_tracks.write().await.remove(user_id);
-                }
-                channel.stats.remove(user_id);
-                channel.members.remove(user_id);
-            }
-            // Drop empty channels
-            if channels
-                .get(&channel_id)
-                .map_or(false, |c| c.members.is_empty())
-            {
-                channels.remove(&channel_id);
-            }
-        }
-
-        broadcast_to_channel(
-            state,
-            &channel_id,
-            &ServerMessage::PeerLeft {
-                channel_id: channel_id.clone(),
-                user_id: user_id.to_string(),
-            },
-            None,
-        )
-        .await;
+    let peer_id = PeerId::from(user_id);
+    if let Err(e) = state.sfu.remove_peer(&peer_id).await {
+        tracing::debug!("sfu.remove_peer({}): {:?}", user_id, e);
     }
+    state.peers.write().await.remove(user_id);
 }

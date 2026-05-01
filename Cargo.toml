@@ -2,7 +2,8 @@
 members = [
   "apps/desktop/src-tauri",
   "packages/core-wasm",
-  "packages/signaling-server"
+  "packages/signaling-server",
+  "packages/void-sfu"
 ]
 resolver = "2"
 

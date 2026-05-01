@@ -1,0 +1,189 @@
+// Copyright (c) 2025 Raphael Taibi. All rights reserved.
+// Licensed under the Business Source License 1.1 (BUSL-1.1).
+// Use of this source code is governed by the LICENSE file at the
+// repository root. Change Date: 2031-04-07. Change License:
+// GPL-3.0-or-later.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! SDP-level entry points (offer / answer / ICE) and PC bootstrap helpers.
+
+use std::sync::Arc;
+
+use tracing::{debug, warn};
+use webrtc::ice_transport::ice_candidate::RTCIceCandidateInit;
+use webrtc::ice_transport::ice_server::RTCIceServer;
+use webrtc::peer_connection::configuration::RTCConfiguration;
+use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
+
+use crate::error::{SfuError, SfuResult};
+use crate::forwarder::PeerEntry;
+use crate::id::PeerId;
+use crate::models::IceCandidate;
+use crate::sfu::SfuInner;
+use crate::signal::Outbound;
+
+use super::catchup::catchup_existing_tracks;
+use super::data_channel::install_on_data_channel;
+use super::tracks::install_on_track;
+
+/// Builds the [`RTCConfiguration`] for a new PC from the SFU config.
+pub(super) fn build_rtc_config(ice_servers: &[String]) -> RTCConfiguration {
+    RTCConfiguration {
+        ice_servers: vec![RTCIceServer {
+            urls: ice_servers.to_vec(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+}
+
+/// Handles an incoming SDP offer for `peer_id`.
+///
+/// Order of operations:
+/// 1. Build PC, install `on_ice_candidate` and `on_track` callbacks.
+/// 2. `set_remote_description(offer)` â†’ `create_answer` â†’ `set_local_description(answer)`.
+/// 3. Deliver the answer to the peer immediately (unblocks polite clients).
+/// 4. Run `catchup_existing_tracks` which adds existing forwarders' tracks
+///    to the new PC and triggers a *separate* renegotiation cycle. Because
+///    the answer is already in flight, this never collides with step 2.
+pub(crate) async fn handle_offer(
+    inner: Arc<SfuInner>,
+    peer_id: PeerId,
+    sdp: &str,
+) -> SfuResult<()> {
+    let sdp_str = sdp.to_string();
+
+    // Resolve the peer's current room (must be set by `join_room` first).
+    let peer_entry = inner
+        .peers
+        .get(&peer_id)
+        .ok_or_else(|| SfuError::PeerNotFound(peer_id.as_arc()))?
+        .value()
+        .clone();
+
+    let room_id = peer_entry
+        .room
+        .read()
+        .clone()
+        .ok_or_else(|| SfuError::PeerNotInRoom(peer_id.as_arc()))?;
+
+    let pc = Arc::new(
+        inner
+            .api
+            .new_peer_connection(build_rtc_config(&inner.config.ice_servers))
+            .await?,
+    );
+
+    install_ice_relay(&pc, &peer_entry);
+    install_on_track(&pc, Arc::clone(&inner), peer_id.clone(), room_id.clone());
+    install_on_data_channel(&pc, Arc::clone(&inner), peer_id.clone(), room_id.clone());
+
+    let session =
+        RTCSessionDescription::offer(sdp_str).map_err(|e| SfuError::InvalidSdp(e.to_string()))?;
+    pc.set_remote_description(session).await?;
+    let answer = pc.create_answer(None).await?;
+    pc.set_local_description(answer.clone()).await?;
+
+    // Persist the PC on the peer entry *before* sending the answer so any
+    // concurrent `handle_ice` finds it.
+    {
+        let mut guard = peer_entry.peer_connection.lock().await;
+        *guard = Some(Arc::clone(&pc));
+    }
+
+    let answer_sdp = answer.sdp.clone();
+    if let Err(e) = peer_entry
+        .sink
+        .deliver(&peer_id, Outbound::Answer { sdp: answer_sdp })
+        .await
+    {
+        warn!("sink delivery (answer) failed for {}: {:?}", peer_id, e);
+    }
+
+    // ---- Catchup runs AFTER the answer is on the wire (race fix) ----
+    catchup_existing_tracks(inner, peer_id, room_id, pc).await
+}
+
+/// Wires `on_ice_candidate` to forward server-side candidates back to the peer.
+pub(super) fn install_ice_relay(
+    pc: &Arc<webrtc::peer_connection::RTCPeerConnection>,
+    peer_entry: &Arc<PeerEntry>,
+) {
+    let sink = Arc::clone(&peer_entry.sink);
+    let pid = peer_entry.id.clone();
+    pc.on_ice_candidate(Box::new(move |c| {
+        let sink = Arc::clone(&sink);
+        let pid = pid.clone();
+        Box::pin(async move {
+            let Some(candidate) = c else { return };
+            let init = match candidate.to_json() {
+                Ok(j) => j,
+                Err(e) => {
+                    warn!("ice to_json failed: {:?}", e);
+                    return;
+                }
+            };
+            let ice = IceCandidate {
+                candidate: init.candidate,
+                sdp_mid: init.sdp_mid,
+                sdp_mline_index: init.sdp_mline_index,
+                username_fragment: init.username_fragment,
+            };
+            if let Err(e) = sink.deliver(&pid, Outbound::Ice { candidate: ice }).await {
+                debug!("sink ice delivery failed: {:?}", e);
+            }
+        })
+    }));
+}
+
+/// Applies an SDP answer to the peer's existing PC.
+pub(crate) async fn handle_answer(
+    inner: Arc<SfuInner>,
+    peer_id: PeerId,
+    sdp: &str,
+) -> SfuResult<()> {
+    let sdp_str = sdp.to_string();
+
+    let entry = inner
+        .peers
+        .get(&peer_id)
+        .ok_or_else(|| SfuError::PeerNotFound(peer_id.as_arc()))?
+        .value()
+        .clone();
+
+    let pc_opt = entry.peer_connection.lock().await.clone();
+    let pc = pc_opt.ok_or(SfuError::Internal("answer received before offer"))?;
+    let session =
+        RTCSessionDescription::answer(sdp_str).map_err(|e| SfuError::InvalidSdp(e.to_string()))?;
+    pc.set_remote_description(session).await?;
+    Ok(())
+}
+
+/// Adds an ICE candidate to the peer's PC.
+pub(crate) async fn handle_ice(
+    inner: Arc<SfuInner>,
+    peer_id: PeerId,
+    candidate: IceCandidate,
+) -> SfuResult<()> {
+    let entry = inner
+        .peers
+        .get(&peer_id)
+        .ok_or_else(|| SfuError::PeerNotFound(peer_id.as_arc()))?
+        .value()
+        .clone();
+
+    let pc_opt = entry.peer_connection.lock().await.clone();
+    let Some(pc) = pc_opt else {
+        // ICE before offer is benign; clients buffer their own candidates.
+        return Ok(());
+    };
+
+    let init = RTCIceCandidateInit {
+        candidate: candidate.candidate,
+        sdp_mid: candidate.sdp_mid,
+        sdp_mline_index: candidate.sdp_mline_index,
+        username_fragment: candidate.username_fragment,
+    };
+    pc.add_ice_candidate(init).await?;
+    Ok(())
+}

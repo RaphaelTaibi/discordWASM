@@ -26,6 +26,17 @@ export function useSfuConnection({
     /** Track-maps received before their corresponding `ontrack` event. */
     const pendingTrackMapsRef = useRef<Map<string, { userId: string; kind: string }>>(new Map());
 
+    // ---- Perfect-negotiation state ----
+    // The SFU is the "impolite" peer; this client is "polite". On glare
+    // (offer received while a local offer is in-flight or signalingState
+    // !== 'stable') the polite peer rolls back and accepts the remote offer.
+    // This unblocks the audio-isolation bug observed when two users join the
+    // same voice channel: the server's catch-up renegotiation offer would
+    // otherwise collide with the client's initial offer and silently fail.
+    const makingOfferRef = useRef<boolean>(false);
+    const ignoreOfferRef = useRef<boolean>(false);
+    const isSettingRemoteAnswerPendingRef = useRef<boolean>(false);
+
     const removeScreenTrack = useCallback(() => {
         if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach(t => t.stop());
@@ -49,6 +60,11 @@ export function useSfuConnection({
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
         sfuConnectionRef.current = pc;
+
+        // Reset perfect-negotiation flags for the new PC instance.
+        makingOfferRef.current = false;
+        ignoreOfferRef.current = false;
+        isSettingRemoteAnswerPendingRef.current = false;
 
         const local = localStreamRef.current;
         if (local) local.getAudioTracks().forEach(t => pc.addTrack(t, local));
@@ -94,12 +110,21 @@ export function useSfuConnection({
             orphanStreamsRef.current.set(stream.id, { stream, kind: track.kind });
         };
 
+        // Perfect-negotiation: drive (re)negotiation through a single guarded path.
         pc.onnegotiationneeded = async () => {
             try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                sendSignal({ type: 'offer', sdp: offer } as any);
-            } catch (err) { console.error("RTC negotiation error:", err); }
+                makingOfferRef.current = true;
+                // setLocalDescription() with no args lets the browser pick the
+                // right SDP (offer/answer/rollback) given the current state.
+                await pc.setLocalDescription();
+                if (pc.localDescription) {
+                    sendSignal({ type: 'offer', sdp: pc.localDescription } as any);
+                }
+            } catch (err) {
+                console.error('RTC negotiation error:', err);
+            } finally {
+                makingOfferRef.current = false;
+            }
         };
     }, [sendSignal, localStreamRef, setRemoteStreams, setRemoteVideoStreams]);
 
@@ -185,24 +210,76 @@ export function useSfuConnection({
                     });
                     break;
                 }
-                case 'offer':
-                    if (!sfuConnectionRef.current) connectSFU();
-                    await sfuConnectionRef.current!.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-                    const _answer = await sfuConnectionRef.current!.createAnswer();
-                    await sfuConnectionRef.current!.setLocalDescription(_answer);
-                    sendSignal({ type: 'answer', sdp: _answer } as any);
+                case 'offer': {
+                    if (!sfuConnectionRef.current) await connectSFU();
+                    const _pc = sfuConnectionRef.current!;
+                    // Polite-peer collision detection: a glare happens when a
+                    // remote offer arrives while a local offer is in-flight or
+                    // the PC is not in a clean `stable` state. We accept the
+                    // server's offer in any case (the SFU is impolite) by
+                    // letting setLocalDescription() perform an implicit rollback
+                    // if needed (browsers ≥ M80 / Firefox ≥ 75 support this).
+                    const _readyForOffer = !makingOfferRef.current
+                        && (_pc.signalingState === 'stable' || isSettingRemoteAnswerPendingRef.current);
+                    const _offerCollision = !_readyForOffer;
+                    ignoreOfferRef.current = false; // polite — never ignore
+                    if (_offerCollision) {
+                        // Implicit rollback via parallel set: setRemoteDescription
+                        // with an offer in have-local-offer state triggers rollback.
+                        await Promise.all([
+                            _pc.setLocalDescription({ type: 'rollback' }).catch(() => {}),
+                            _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)),
+                        ]);
+                    } else {
+                        await _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    }
+                    await _pc.setLocalDescription();
+                    if (_pc.localDescription) {
+                        sendSignal({ type: 'answer', sdp: _pc.localDescription } as any);
+                    }
                     break;
-                case 'answer':
-                    if (sfuConnectionRef.current) await sfuConnectionRef.current.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                }
+                case 'answer': {
+                    if (!sfuConnectionRef.current) break;
+                    const _pc = sfuConnectionRef.current;
+                    if (_pc.signalingState !== 'have-local-offer') {
+                        // Stale answer (already rolled-back or superseded). Drop it
+                        // rather than crash setRemoteDescription.
+                        break;
+                    }
+                    isSettingRemoteAnswerPendingRef.current = true;
+                    try {
+                        await _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    } finally {
+                        isSettingRemoteAnswerPendingRef.current = false;
+                    }
                     break;
+                }
                 case 'ice':
-                    if (sfuConnectionRef.current && msg.candidate) await sfuConnectionRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                    if (sfuConnectionRef.current && msg.candidate) {
+                        try {
+                            await sfuConnectionRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                        } catch (err) {
+                            // Tolerate ICE errors during rollback — they are expected
+                            // and would otherwise spam the console.
+                            if (!ignoreOfferRef.current) console.warn('ICE add failed:', err);
+                        }
+                    }
                     break;
                 case 'chat':
                     setChatMessages(prev => {
                         const id = `${msg.from}-${msg.timestamp}`;
                         if (prev.some(m => m.id === id)) return prev;
                         return [...prev, { id, from: msg.from, username: msg.username, message: msg.message, timestamp: Number(msg.timestamp), channelId: msg.channelId }];
+                    });
+                    // Fan out to bus subscribers (ChatContext + future consumers).
+                    emitSignalingEvent('chat', {
+                        id: `${msg.from}-${msg.timestamp}`,
+                        from: msg.from,
+                        username: msg.username,
+                        message: msg.message,
+                        timestamp: Number(msg.timestamp),
+                        channelId: msg.channelId,
                     });
                     break;
                 case 'stats':
@@ -216,8 +293,14 @@ export function useSfuConnection({
                 case 'friend-request-declined':
                 case 'friend-request-cancelled':
                 case 'friend-removed':
-                    // Forward social events to the signaling bus so feature
-                    // contexts (e.g. FriendsContext) can react without coupling.
+                    emitSignalingEvent(msg.type, msg as never);
+                    break;
+                case 'authenticated':
+                case 'server-member-presence':
+                case 'server-member-added':
+                case 'server-member-removed':
+                case 'rpc-result':
+                    // Phase 3 push events — forwarded verbatim to the bus.
                     emitSignalingEvent(msg.type, msg as never);
                     break;
             }
@@ -230,4 +313,3 @@ export function useSfuConnection({
         addScreenTrack, removeScreenTrack,
     };
 }
-

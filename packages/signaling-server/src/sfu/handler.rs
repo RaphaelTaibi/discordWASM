@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -8,11 +7,16 @@ use axum::response::IntoResponse;
 use axum::Extension;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
+use tracing::{debug, warn};
+use void_sfu::{PeerId, RoomId, SignalSink};
 
+use super::adapter::WsPeerSink;
 use super::broadcast::{broadcast_to_channel, remove_peer, serialize_message};
 use super::models::{ClientMessage, PeerInfo, ServerMessage};
-use super::negotiation;
-use super::state::{AppState, ChannelState, ChatEntry, PeerSession, RTCPStats, WS_CHANNEL_CAPACITY, CHAT_HISTORY_CAP};
+use super::rpc as ws_rpc;
+use super::state::{AppState, ChatEntry, PeerSession, WS_CHANNEL_CAPACITY, CHAT_HISTORY_CAP};
+use super::subscriptions::{push_to_channel_subscribers, push_to_server_subscribers};
+use crate::auth::jwt;
 use crate::fraud::FraudState;
 use crate::metrics::WS_QUEUE_DROPPED;
 
@@ -37,8 +41,11 @@ async fn handle_socket(
 ) {
     let (mut socket_sender, mut socket_receiver) = socket.split();
     let (tx, mut rx) = mpsc::channel::<String>(WS_CHANNEL_CAPACITY);
-    let mut current_user_id: Option<String> = None;
 
+    // Voice user_id (set by `Join`); identifies the peer in the SFU.
+    let mut current_user_id: Option<String> = None;
+    // Authenticated user_id (set by `Authenticate`); required for any RPC.
+    let mut auth_user_id: Option<String> = None;
     let send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if socket_sender.send(Message::Text(msg)).await.is_err() {
@@ -69,20 +76,45 @@ async fn handle_socket(
                 if let (Some(fp), Some(fs)) = (&fingerprint, &fraud_state) {
                     fs.bans.record_fingerprint(fp, &ip);
                 }
-                handle_join(&state, &tx, &mut current_user_id, channel_id, user_id, username)
-                    .await;
+                if let Err(e) = handle_join(
+                    &state,
+                    &tx,
+                    &mut current_user_id,
+                    channel_id,
+                    user_id,
+                    username,
+                )
+                .await
+                {
+                    warn!("join failed: {:?}", e);
+                }
             }
 
             ClientMessage::Offer { sdp } => {
-                negotiation::handle_offer(&state, &tx, &current_user_id, sdp).await;
+                if let Some(uid) = current_user_id.as_deref() {
+                    let pid = PeerId::from(uid);
+                    if let Err(e) = state.sfu.handle_offer(&pid, sdp).await {
+                        warn!("sfu.handle_offer({}): {:?}", uid, e);
+                    }
+                }
             }
 
             ClientMessage::Answer { sdp } => {
-                negotiation::handle_answer(&state, &current_user_id, sdp).await;
+                if let Some(uid) = current_user_id.as_deref() {
+                    let pid = PeerId::from(uid);
+                    if let Err(e) = state.sfu.handle_answer(&pid, sdp).await {
+                        debug!("sfu.handle_answer({}): {:?}", uid, e);
+                    }
+                }
             }
 
             ClientMessage::Ice { candidate } => {
-                negotiation::handle_ice(&state, &current_user_id, candidate).await;
+                if let Some(uid) = current_user_id.as_deref() {
+                    let pid = PeerId::from(uid);
+                    if let Err(e) = state.sfu.handle_ice(&pid, candidate).await {
+                        debug!("sfu.handle_ice({}): {:?}", uid, e);
+                    }
+                }
             }
 
             ClientMessage::MediaState {
@@ -126,7 +158,6 @@ async fn handle_socket(
                     timestamp,
                 };
 
-                // Persist in capped ring buffer
                 {
                     let mut history = state.chat_history.write().await;
                     let buf = history
@@ -138,19 +169,16 @@ async fn handle_socket(
                     buf.push_back(entry);
                 }
 
-                broadcast_to_channel(
-                    &state,
-                    &channel_id,
-                    &ServerMessage::Chat {
-                        channel_id: channel_id.clone(),
-                        from,
-                        username,
-                        message,
-                        timestamp,
-                    },
-                    None,
-                )
-                .await;
+                let payload = ServerMessage::Chat {
+                    channel_id: channel_id.clone(),
+                    from,
+                    username,
+                    message,
+                    timestamp,
+                };
+                // Voice-room broadcast (legacy path) + text-channel subscribers.
+                broadcast_to_channel(&state, &channel_id, &payload, None).await;
+                push_to_channel_subscribers(&state, &channel_id, &payload, None).await;
             }
 
             ClientMessage::Leave { .. } => {
@@ -158,16 +186,126 @@ async fn handle_socket(
                     remove_peer(&state, &uid).await;
                 }
             }
+
+            ClientMessage::Authenticate { token } => {
+                handle_authenticate(&state, &tx, &mut auth_user_id, token).await;
+            }
+
+            ClientMessage::SubscribeChannel { channel_id } => {
+                if let Some(uid) = auth_user_id.as_deref() {
+                    state.subscriptions.subscribe_channel(&channel_id, uid);
+                }
+            }
+
+            ClientMessage::UnsubscribeChannel { channel_id } => {
+                if let Some(uid) = auth_user_id.as_deref() {
+                    state.subscriptions.unsubscribe_channel(&channel_id, uid);
+                }
+            }
+
+            ClientMessage::SubscribeServer { server_id } => {
+                if let Some(uid) = auth_user_id.as_deref() {
+                    state.subscriptions.subscribe_server(&server_id, uid);
+                    // Push self-presence so other subscribers see the new arrival.
+                    push_to_server_subscribers(
+                        &state,
+                        &server_id,
+                        &ServerMessage::ServerMemberPresence {
+                            server_id: server_id.clone(),
+                            user_id: uid.to_string(),
+                            online: true,
+                        },
+                        Some(uid),
+                    )
+                    .await;
+                }
+            }
+
+            ClientMessage::UnsubscribeServer { server_id } => {
+                if let Some(uid) = auth_user_id.as_deref() {
+                    state.subscriptions.unsubscribe_server(&server_id, uid);
+                }
+            }
+
+            ClientMessage::Rpc {
+                request_id,
+                method,
+                params,
+            } => {
+                ws_rpc::dispatch(
+                    &state,
+                    auth_user_id.as_deref(),
+                    request_id,
+                    method,
+                    params,
+                    &tx,
+                )
+                .await;
+            }
         }
     }
 
     if let Some(user_id) = current_user_id {
         remove_peer(&state, &user_id).await;
     }
+    if let Some(uid) = auth_user_id.take() {
+        // Drop all subscriptions and broadcast offline presence.
+        let servers = state.subscriptions.drop_user(&uid);
+        for server_id in servers {
+            let sid_clone = server_id.clone();
+            push_to_server_subscribers(
+                &state,
+                &server_id,
+                &ServerMessage::ServerMemberPresence {
+                    server_id: sid_clone,
+                    user_id: uid.clone(),
+                    online: false,
+                },
+                Some(&uid),
+            )
+            .await;
+        }
+    }
     send_task.abort();
 }
 
-/// Processes a Join message: registers the peer, notifies the channel.
+/// Validates the JWT and binds the authenticated user_id to the WS.
+async fn handle_authenticate(
+    state: &Arc<AppState>,
+    tx: &mpsc::Sender<String>,
+    auth_user_id: &mut Option<String>,
+    token: String,
+) {
+    let outcome = match jwt::decode_token(&token) {
+        Ok(claims) => {
+            *auth_user_id = Some(claims.sub.clone());
+            ServerMessage::Authenticated {
+                user_id: claims.sub,
+                ok: true,
+            }
+        }
+        Err(e) => {
+            debug!("WS auth failed: {:?}", e);
+            *auth_user_id = None;
+            ServerMessage::Authenticated {
+                user_id: String::new(),
+                ok: false,
+            }
+        }
+    };
+
+    if let Some(payload) = serialize_message(&outcome) {
+        if tx.try_send(payload).is_err() {
+            WS_QUEUE_DROPPED.inc();
+        }
+    }
+
+    // Skip presence broadcast — clients explicitly subscribe to servers.
+    let _ = state; // keep the binding referenced when no subscriptions are needed.
+}
+
+/// Processes a Join message: registers the peer in the SFU, persists host-side
+/// metadata, and emits the snapshot `Joined` message back to the joiner.
 async fn handle_join(
     state: &Arc<AppState>,
     tx: &mpsc::Sender<String>,
@@ -175,39 +313,24 @@ async fn handle_join(
     channel_id: String,
     user_id: String,
     username: String,
-) {
+) -> Result<(), void_sfu::SfuError> {
     if let Some(old_id) = current_user_id.take() {
-        remove_peer(state, &old_id).await;
+        if old_id != user_id {
+            remove_peer(state, &old_id).await;
+        }
     }
 
-    let (existing_peers, started_at) = {
-        let mut channels = state.channels.write().await;
-        let channel = channels
-            .entry(channel_id.clone())
-            .or_insert_with(|| ChannelState {
-                members: HashSet::new(),
-                forwarders: HashMap::new(),
-                stats: HashMap::new(),
-                started_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
-            });
-        let peers = state.peers.read().await;
-        let existing = channel
-            .members
-            .iter()
-            .filter_map(|m_id| {
-                peers.get(m_id).map(|p| PeerInfo {
-                    user_id: p.user_id.clone(),
-                    username: p.username.clone(),
-                    is_muted: p.is_muted,
-                    is_deafened: p.is_deafened,
-                })
-            })
-            .collect::<Vec<PeerInfo>>();
-        (existing, channel.started_at)
-    };
+    let peer_id = PeerId::from(user_id.as_str());
+
+    if state.sfu.peer_room(&peer_id).is_none() && !sfu_knows_peer(state, &peer_id) {
+        let sink: Arc<dyn SignalSink> = Arc::new(WsPeerSink::new(tx.clone()));
+        if let Err(e) = state.sfu.add_peer(peer_id.clone(), sink) {
+            debug!("add_peer race: {:?} — recovering", e);
+            let _ = state.sfu.remove_peer(&peer_id).await;
+            let sink: Arc<dyn SignalSink> = Arc::new(WsPeerSink::new(tx.clone()));
+            state.sfu.add_peer(peer_id.clone(), sink)?;
+        }
+    }
 
     state.peers.write().await.insert(
         user_id.clone(),
@@ -218,43 +341,44 @@ async fn handle_join(
             tx: tx.clone(),
             is_muted: false,
             is_deafened: false,
-            peer_connection: None,
         },
     );
 
-    {
-        let mut channels = state.channels.write().await;
-        if let Some(channel) = channels.get_mut(&channel_id) {
-            channel.members.insert(user_id.clone());
-            channel.stats.insert(user_id.clone(), RTCPStats::new());
-        }
-    }
+    let snapshot = state
+        .sfu
+        .join_room(&peer_id, RoomId::from(channel_id.as_str()))
+        .await?;
+
+    let existing_peers: Vec<PeerInfo> = {
+        let peers = state.peers.read().await;
+        snapshot
+            .existing_peers
+            .iter()
+            .filter_map(|p| {
+                peers.get(p.peer_id.as_str()).map(|host| PeerInfo {
+                    user_id: host.user_id.clone(),
+                    username: host.username.clone(),
+                    is_muted: host.is_muted,
+                    is_deafened: host.is_deafened,
+                })
+            })
+            .collect()
+    };
 
     if let Some(payload) = serialize_message(&ServerMessage::Joined {
         channel_id: channel_id.clone(),
         peers: existing_peers,
-        started_at,
+        started_at: snapshot.started_at_ms,
     }) {
         if tx.try_send(payload).is_err() {
             WS_QUEUE_DROPPED.inc();
         }
     }
 
-    broadcast_to_channel(
-        state,
-        &channel_id,
-        &ServerMessage::PeerJoined {
-            channel_id: channel_id.clone(),
-            peer: PeerInfo {
-                user_id: user_id.clone(),
-                username,
-                is_muted: false,
-                is_deafened: false,
-            },
-        },
-        Some(&user_id),
-    )
-    .await;
-
     *current_user_id = Some(user_id);
+    Ok(())
+}
+
+fn sfu_knows_peer(state: &Arc<AppState>, peer_id: &PeerId) -> bool {
+    state.sfu.peer_room(peer_id).is_some()
 }

@@ -1,28 +1,34 @@
+import { UserSummary } from '../models/auth/serverAuth.model';
+import ChatMessage from '../models/chat/chatMessage.model';
 import { FriendEventPayload } from '../models/social/friendEventPayload.model';
 
 /**
- * Lightweight typed pub/sub bridging the WS dispatcher (in `useSfuConnection`)
- * and feature contexts (e.g. `FriendsContext`) without coupling them.
+ * Strongly-typed map of every event the signaling-bus can carry.
  *
- * Event keys mirror the `type` discriminant of {@link FriendEventPayload}.
+ * Friend events keep their original `type`-discriminated payloads; new
+ * Phase-3 push events are documented inline.
  */
-type SignalingEventMap = {
+export type SignalingEventMap = {
+    // ---- Friend social events ----
     'friend-request-received': Extract<FriendEventPayload, { type: 'friend-request-received' }>;
     'friend-request-accepted': Extract<FriendEventPayload, { type: 'friend-request-accepted' }>;
     'friend-request-declined': Extract<FriendEventPayload, { type: 'friend-request-declined' }>;
     'friend-request-cancelled': Extract<FriendEventPayload, { type: 'friend-request-cancelled' }>;
     'friend-removed': Extract<FriendEventPayload, { type: 'friend-removed' }>;
+
+    // ---- Phase 3 push events ----
+    'authenticated': { userId: string; ok: boolean };
+    'chat': ChatMessage;
+    'server-member-presence': { serverId: string; userId: string; online: boolean };
+    'server-member-added': { serverId: string; member: UserSummary };
+    'server-member-removed': { serverId: string; userId: string };
+    'rpc-result': { requestId: string; result?: unknown; error?: { code: string; message: string } };
 };
 
 type Handler<K extends keyof SignalingEventMap> = (payload: SignalingEventMap[K]) => void;
 
 const _target = new EventTarget();
 
-/**
- * Emits a signaling event to every subscriber of `type`.
- * @param type Event discriminant.
- * @param payload Full payload (including the `type` field, matching server WS schema).
- */
 export const emitSignalingEvent = <K extends keyof SignalingEventMap>(
     type: K,
     payload: SignalingEventMap[K],
@@ -30,10 +36,6 @@ export const emitSignalingEvent = <K extends keyof SignalingEventMap>(
     _target.dispatchEvent(new CustomEvent(type, { detail: payload }));
 };
 
-/**
- * Subscribes to a signaling event.
- * @returns A teardown function that removes the listener.
- */
 export const subscribeSignalingEvent = <K extends keyof SignalingEventMap>(
     type: K,
     handler: Handler<K>,
@@ -42,4 +44,3 @@ export const subscribeSignalingEvent = <K extends keyof SignalingEventMap>(
     _target.addEventListener(type, _listener);
     return () => _target.removeEventListener(type, _listener);
 };
-

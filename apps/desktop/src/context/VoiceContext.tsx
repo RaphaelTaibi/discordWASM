@@ -14,6 +14,8 @@ import { useFingerprint } from '../hooks/useFingerprint';
 import { useVoiceSettings } from '../hooks/useVoiceSettings';
 import { useSfuConnection } from '../hooks/useSfuConnection';
 import { useChannelManager } from '../hooks/useChannelManager';
+import { setSignalingSender } from '../lib/signalingTransport';
+import { getToken } from '../api/http-client';
 
 const RAW_URL = import.meta.env.VITE_SIGNALING_URL || "wss://127.0.0.1:3001/ws";
 const SIGNALING_URL = RAW_URL.replace(/^["']/, "").replace(/["']$/, "").trim();
@@ -108,14 +110,24 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
             socketRef.current = socket;
             setIsConnected(true);
 
+            // Expose the active sender to feature modules (RPC, subscriptions).
+            setSignalingSender((payload) => socket.send(JSON.stringify(payload)));
+
             await socket.addListener((msg) => {
                 if (msg.type === 'Text') handleMessage(msg.data);
                 if (msg.type === 'Close') {
                     socketRef.current = null;
+                    setSignalingSender(null);
                     setIsConnected(false);
                     setTimeout(connectSocket, 3_000);
                 }
             });
+
+            // Authenticate the WS so RPC calls can use the JWT identity.
+            const _token = getToken();
+            if (_token) {
+                await socket.send(JSON.stringify({ type: 'authenticate', token: _token }));
+            }
 
             const _initialJoin: ClientSignalMessage = {
                 type: 'join',

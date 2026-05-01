@@ -10,10 +10,11 @@ import {
     rejectRequest as apiReject,
     removeFriend as apiRemove,
     removeFriendByUser as apiRemoveByUser,
-} from '../api/friends.api';
+} from '../api/friends.ws';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { useFriendsRealtime } from '../hooks/useFriendsRealtime';
+import { subscribeSignalingEvent } from '../lib/signalingBus';
 
 
 const FriendsContext = createContext<FriendsContextValue | undefined>(undefined);
@@ -47,8 +48,17 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [token]);
 
-    // Initial sync on mount / token change — source of truth for offline catch-up.
+    // Initial sync on mount / token change. The WS RPC requires the socket
+    // to be authenticated, which happens shortly after `VoiceContext` opens
+    // it; subscribe to the `authenticated` bus event so we refresh as soon
+    // as auth completes (covers cold-start where REST→WS used to race).
     useEffect(() => { refresh(); }, [refresh]);
+    useEffect(() => {
+        const _off = subscribeSignalingEvent('authenticated', (e) => {
+            if (e.ok) refresh();
+        });
+        return _off;
+    }, [refresh]);
 
     // Live updates from the signaling WS via the bus.
     useFriendsRealtime({
