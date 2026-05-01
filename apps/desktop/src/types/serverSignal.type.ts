@@ -7,8 +7,8 @@ export type ServerSignal =
     | { type: 'joined'; channelId: string; peers: VoicePeer[]; startedAt: number }
     | { type: 'peer-joined'; channelId: string; peer: VoicePeer }
     | { type: 'peer-left'; channelId: string; userId: string }
-    | { type: 'answer'; sdp: RTCSessionDescriptionInit }
-    | { type: 'offer'; sdp: RTCSessionDescriptionInit }
+    | { type: 'answer'; sdp: string }
+    | { type: 'offer'; sdp: string }
     | { type: 'ice'; candidate: RTCIceCandidateInit }
     | { type: 'peer-state'; channelId: string; userId: string; isMuted: boolean; isDeafened: boolean }
     | { type: 'track-map'; userId: string; trackId: string; streamId: string; kind: string }

@@ -213,25 +213,30 @@ export function useSfuConnection({
                 case 'offer': {
                     if (!sfuConnectionRef.current) await connectSFU();
                     const _pc = sfuConnectionRef.current!;
+                    // The SFU sends `sdp` as a raw SDP string (not a full
+                    // RTCSessionDescriptionInit). Wrap it client-side. Using
+                    // a plain init object also avoids the deprecated
+                    // RTCSessionDescription constructor, which silently
+                    // produced a broken description in modern browsers and
+                    // prevented DTLS from completing — the actual reason
+                    // remote audio/video was never delivered.
+                    const _offerInit: RTCSessionDescriptionInit = { type: 'offer', sdp: msg.sdp };
                     // Polite-peer collision detection: a glare happens when a
                     // remote offer arrives while a local offer is in-flight or
-                    // the PC is not in a clean `stable` state. We accept the
-                    // server's offer in any case (the SFU is impolite) by
-                    // letting setLocalDescription() perform an implicit rollback
-                    // if needed (browsers ≥ M80 / Firefox ≥ 75 support this).
+                    // the PC is not in a clean `stable` state. The SFU is
+                    // impolite, so we always accept its offer, performing a
+                    // rollback when needed (browsers ≥ M80 / Firefox ≥ 75).
                     const _readyForOffer = !makingOfferRef.current
                         && (_pc.signalingState === 'stable' || isSettingRemoteAnswerPendingRef.current);
                     const _offerCollision = !_readyForOffer;
                     ignoreOfferRef.current = false; // polite — never ignore
                     if (_offerCollision) {
-                        // Implicit rollback via parallel set: setRemoteDescription
-                        // with an offer in have-local-offer state triggers rollback.
                         await Promise.all([
                             _pc.setLocalDescription({ type: 'rollback' }).catch(() => {}),
-                            _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)),
+                            _pc.setRemoteDescription(_offerInit),
                         ]);
                     } else {
-                        await _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        await _pc.setRemoteDescription(_offerInit);
                     }
                     await _pc.setLocalDescription();
                     if (_pc.localDescription) {
@@ -247,9 +252,11 @@ export function useSfuConnection({
                         // rather than crash setRemoteDescription.
                         break;
                     }
+                    // Same wire-format note as for 'offer': `msg.sdp` is a string.
+                    const _answerInit: RTCSessionDescriptionInit = { type: 'answer', sdp: msg.sdp };
                     isSettingRemoteAnswerPendingRef.current = true;
                     try {
-                        await _pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        await _pc.setRemoteDescription(_answerInit);
                     } finally {
                         isSettingRemoteAnswerPendingRef.current = false;
                     }
