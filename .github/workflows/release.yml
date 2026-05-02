@@ -5,6 +5,13 @@ on:
     tags:
       - 'v*'
 
+# Required so `tauri-action` can create the GitHub Release and upload bundles
+# via the default GITHUB_TOKEN. The repo Settings → Actions → General →
+# "Workflow permissions" must also be set to "Read and write permissions",
+# otherwise this declaration cannot elevate the token (org/repo policy caps it).
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
