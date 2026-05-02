@@ -18,7 +18,7 @@ vi.mock('../../api/dm.ws', async () => {
 });
 
 vi.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ userId: 'me' }),
+    useAuth: () => ({ userId: 'me', serverUserId: 'me' }),
 }));
 
 // FriendsContext is consumed by DmProvider for unknown-peer lookups.

@@ -29,7 +29,12 @@ const _newClientMsgId = (): string =>
  * server presence) — voice/video media stays on its own WebRTC pipeline.
  */
 export const DmProvider = ({ children }: { children: ReactNode }) => {
-    const { userId } = useAuth();
+    // Server-side UUID — the only id the signaling server uses inside DM
+    // payloads (`fromUserId`, `toUserId`). The legacy `userId` exposed by
+    // `useAuth` is the local Ed25519 public key, which never matches the
+    // server payloads and silently aborted `sendDm` (the "TestMacbook →
+    // Aquila" regression where replies were dropped without an error).
+    const { serverUserId } = useAuth();
     const { friends } = useFriends();
     const [conversations, setConversations] = useState<Record<string, DmConversation>>({});
     const [activePeerId, setActivePeerId] = useState<string | null>(null);
@@ -69,14 +74,14 @@ export const DmProvider = ({ children }: { children: ReactNode }) => {
 
     useDmRealtime({
         setConversations,
-        selfUserId: userId,
+        selfUserId: serverUserId,
         onUnknownPeer: handleUnknownPeer,
     });
 
     // Surface a toast whenever an inbound DM cannot be read in-place
     // (panel closed or focused on another conversation).
     useDmNotifications({
-        selfUserId: userId,
+        selfUserId: serverUserId,
         conversations,
         activePeerId,
         friends,
@@ -128,11 +133,11 @@ export const DmProvider = ({ children }: { children: ReactNode }) => {
     const sendDm = useCallback(
         async (peerId: string, message: string) => {
             const _trimmed = message.trim();
-            if (!_trimmed || !userId) return;
+            if (!_trimmed || !serverUserId) return;
             const _clientMsgId = _newClientMsgId();
             const _placeholder: DmMessage = {
                 id: _clientMsgId,
-                fromUserId: userId,
+                fromUserId: serverUserId,
                 toUserId: peerId,
                 message: _trimmed,
                 timestamp: Date.now(),
@@ -153,7 +158,7 @@ export const DmProvider = ({ children }: { children: ReactNode }) => {
                 console.error('[dm] send failed', e);
             }
         },
-        [userId],
+        [serverUserId],
     );
 
     return (
