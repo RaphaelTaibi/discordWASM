@@ -666,3 +666,4 @@ end-to-end (par exemple deux peers `webrtc-rs` connectés via loopback +
 mesure côté worker de forwarding) — c'est documenté comme travail futur,
 hors scope de la suite criterion.
 
+
