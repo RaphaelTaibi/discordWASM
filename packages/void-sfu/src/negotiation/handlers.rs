@@ -89,7 +89,10 @@ pub(crate) async fn handle_offer(
                 .deliver(&peer_id, Outbound::Answer { sdp: answer_sdp })
                 .await
             {
-                warn!("sink delivery (answer/reneg) failed for {}: {:?}", peer_id, e);
+                warn!(
+                    "sink delivery (answer/reneg) failed for {}: {:?}",
+                    peer_id, e
+                );
             }
             return Ok(());
         }

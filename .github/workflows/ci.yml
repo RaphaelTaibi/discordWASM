@@ -87,6 +87,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Install dependencies
+        env:
+          # Inject production hosts into the Tauri CSP via the
+          # `postinstall` hook (apps/desktop/scripts/inject-csp.mjs).
+          # Falls back to localhost-only origins if the secrets are absent.
+          VITE_SIGNALING_URL: ${{ secrets.VITE_SIGNALING_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: pnpm install --frozen-lockfile
       - name: Build core-wasm bindings (required by tsc)
         run: wasm-pack build --target web --out-dir ../../apps/desktop/src/pkg

@@ -11,6 +11,8 @@
     "build:worklet": "tsc src/worker/noise-gate.worklet.ts --outDir public/worker --module ESNext --target ES2020 --esModuleInterop --skipLibCheck",
     "preview": "vite preview",
     "tauri": "tauri",
+    "csp:inject": "node scripts/inject-csp.mjs",
+    "postinstall": "node scripts/inject-csp.mjs",
     "server:dev": "cd ../.. && $env:DEV_MODE=1; cargo run --package signaling-server",
     "server:prod": "cd ../.. && cargo run --package signaling-server --release",
     "test": "vitest",

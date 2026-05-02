@@ -47,6 +47,9 @@ jobs:
         run: cargo test -p core-wasm --verbose
 
       - name: Install dependencies
+        env:
+          VITE_SIGNALING_URL: ${{ secrets.VITE_SIGNALING_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: pnpm install
 
       - name: Run frontend tests (Vitest)
@@ -115,6 +118,9 @@ jobs:
           wasm-pack build --target web --out-dir ../../apps/desktop/src/pkg
 
       - name: Install dependencies
+        env:
+          VITE_SIGNALING_URL: ${{ secrets.VITE_SIGNALING_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: pnpm install
 
       - name: Build and Publish
@@ -124,6 +130,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SIGNALING_URL: ${{ secrets.VITE_SIGNALING_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
           PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
           BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
         with:
