@@ -29,7 +29,7 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCNzQ5MDk3QjkwRTg3REYKUldUZmh3NjVsNUIwUzRkSzRHYmNRWHhJakRuVm9JU2M4d29XVFkyYnlLUGtJMkord1MwV3RaUVIK",
       "endpoints": [
-        "https://github.com/KernelPanic2id/Void/releases/latest/download/latest.json"
+        "https://github.com/Void-next-gen-WebRTC/Void/releases/latest/download/latest.json"
       ],
       "dialog": true
     }

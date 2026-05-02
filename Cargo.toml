@@ -10,7 +10,7 @@ resolver = "2"
 [workspace.package]
 license = "BUSL-1.1"
 authors = ["Raphael Taibi"]
-repository = "https://github.com/KernelPanic2id/Void"
+repository = "https://github.com/Void-next-gen-WebRTC/Void"
 
 [profile.release]
 lto = true
