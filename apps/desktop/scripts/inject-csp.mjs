@@ -12,7 +12,7 @@
  * the source of truth lives in `.env.*` files locally and in CI secrets
  * (`VITE_SIGNALING_URL`, `VITE_API_URL`, `VITE_TURN_URL`).
  *
- * Behavior: always preserves the localhost dev origins and the GitHub
+ * Behavior: always preserves the Tauri IPC schemes and the GitHub
  * updater endpoint; appends every distinct WS/HTTP origin derived from
  * the env URLs. Idempotent — safe to re-run on every install/build.
  *
@@ -29,7 +29,6 @@ const CONF_PATH = resolve(__dirname, "..", "src-tauri", "tauri.conf.json");
 /**
  * Default origins always allowed:
  * - `'self'`            → app shell.
- * - `localhost:8080`    → local dev signaling server.
  * - `github.com`        → updater (GitHub Releases JSON + binaries).
  * - `ipc:` / `http(s)://ipc.localhost` / `tauri://localhost` → Tauri v2 IPC
  *   custom protocols. The webview MUST be allowed to fetch these schemes,
@@ -37,6 +36,9 @@ const CONF_PATH = resolve(__dirname, "..", "src-tauri", "tauri.conf.json");
  *   loses access to native commands (identity restore, updater check, etc.).
  *   Symptom: user is dropped on the login screen with `find_identity_by_pubkey`
  *   refused, then auto-login fails and voice channels show the user alone.
+ *
+ * Note: no `localhost:8080` here — production never targets a local
+ * signaling server. Dev builds inject `VITE_SIGNALING_URL` directly.
  */
 const STATIC_ORIGINS = [
     "'self'",
@@ -45,8 +47,6 @@ const STATIC_ORIGINS = [
     "https://ipc.localhost",
     "tauri://localhost",
     "https://tauri.localhost",
-    "ws://localhost:8080",
-    "http://localhost:8080",
     "https://github.com",
 ];
 
