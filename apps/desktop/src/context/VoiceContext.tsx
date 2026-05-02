@@ -16,9 +16,14 @@ import { useSfuConnection } from '../hooks/useSfuConnection';
 import { useChannelManager } from '../hooks/useChannelManager';
 import { setSignalingSender } from '../lib/signalingTransport';
 import { getToken } from '../api/http-client';
+import { config } from '../lib/config';
 
-const RAW_URL = import.meta.env.VITE_SIGNALING_URL || "wss://127.0.0.1:3001/ws";
-const SIGNALING_URL = RAW_URL.replace(/^["']/, "").replace(/["']$/, "").trim();
+// Use the centralized signaling URL resolution from `lib/config` so the
+// production fallback (Oracle VM) is honoured when `VITE_SIGNALING_URL`
+// is not injected at build time. The previous hard-coded `127.0.0.1`
+// fallback caused each prod client to dial its own loopback, which
+// silently isolated users into per-machine "phantom" rooms.
+const SIGNALING_URL = config.wsUrl.replace(/^["']/, "").replace(/["']$/, "").trim();
 
 const VoiceContext = createContext<ExtendedVoiceState | undefined>(undefined);
 

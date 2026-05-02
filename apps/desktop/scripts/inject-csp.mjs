@@ -54,6 +54,17 @@ loadDotEnv(resolve(__dirname, "..", ".env"));
 loadDotEnv(resolve(__dirname, "..", ".env.production"));
 
 /**
+ * Production fallback origins. Mirrored from `src/lib/config.ts` so the
+ * webview CSP keeps allowing the live signaling host even when the build
+ * environment did not export `VITE_SIGNALING_URL` / `VITE_API_URL`.
+ * Keep this list in sync with `PROD_WS` / `PROD_API` in `config.ts`.
+ */
+const PROD_FALLBACK_URLS = [
+    "wss://89.168.59.45:3001/ws",
+    "https://89.168.59.45:3001",
+];
+
+/**
  * Extracts a CSP-compatible origin from a URL-like value.
  * - `wss://host:port/path` → `wss://host:port`
  * - `turn:host:port`       → ignored (CSP `connect-src` does not cover TURN)
@@ -84,6 +95,7 @@ const _envOrigins = [
     process.env.VITE_SIGNALING_URL,
     process.env.VITE_API_URL,
     process.env.VITE_TURN_HTTP_URL, // optional HTTP control plane in front of TURN
+    ...PROD_FALLBACK_URLS,
 ]
     .map(originFromUrl)
     .filter(Boolean)
