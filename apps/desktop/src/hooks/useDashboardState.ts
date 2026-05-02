@@ -27,8 +27,14 @@ export function useDashboardState() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     useEffect(() => {
+        console.log('[VOICE] dashboard auth effect', {
+            isAuthenticated, username, userId, serverUserId,
+        });
         if (isAuthenticated && username && serverUserId) {
+            console.log('[VOICE] dashboard → voice.setUserInfo with serverUserId', serverUserId);
             voice.setUserInfo(username, serverUserId);
+        } else {
+            console.warn('[VOICE] dashboard NOT calling setUserInfo (missing pieces)');
         }
     }, [isAuthenticated, username, serverUserId]);
 

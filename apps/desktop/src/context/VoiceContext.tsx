@@ -74,9 +74,13 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
     const sendSignal = useCallback(async (payload: ClientSignalMessage) => {
         if (socketRef.current) {
-            try { await socketRef.current.send(JSON.stringify(payload)); }
-            catch (err) { console.error("Signal send error:", err); }
+            try {
+                console.log('[VOICE] sendSignal →', payload);
+                await socketRef.current.send(JSON.stringify(payload));
+            }
+            catch (err) { console.error("[VOICE] Signal send error:", err); }
         } else {
+            console.log('[VOICE] sendSignal QUEUED (no socket yet) →', payload);
             signalQueueRef.current.push(payload);
         }
     }, []);
@@ -104,23 +108,39 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
     // ── Socket connection ────────────────────────────────────────────
     const connectSocket = useCallback(async () => {
-        if (!userIdRef.current || socketRef.current) return;
+        console.log('[VOICE] connectSocket called', {
+            userId: userIdRef.current,
+            hasSocket: !!socketRef.current,
+            url: SIGNALING_URL,
+        });
+        if (!userIdRef.current || socketRef.current) {
+            console.log('[VOICE] connectSocket SKIP (no userId or already connected)');
+            return;
+        }
         try {
             const _checkUrl = SIGNALING_URL
                 .replace(/^wss?:\/\//, (m: string) => m === 'wss://' ? 'https://' : 'http://')
                 .replace(/\/ws$/, '/health');
+            console.log('[VOICE] health check →', _checkUrl);
             await invoke('call_signaling', { url: _checkUrl });
+            console.log('[VOICE] health check OK');
 
+            console.log('[VOICE] WebSocket.connect →', SIGNALING_URL);
             const socket = await WebSocket.connect(SIGNALING_URL);
             socketRef.current = socket;
             setIsConnected(true);
+            console.log('[VOICE] WebSocket OPEN');
 
             // Expose the active sender to feature modules (RPC, subscriptions).
             setSignalingSender((payload) => socket.send(JSON.stringify(payload)));
 
             await socket.addListener((msg) => {
-                if (msg.type === 'Text') handleMessage(msg.data);
+                if (msg.type === 'Text') {
+                    console.log('[VOICE] WS RX', (msg.data as string).slice(0, 200));
+                    handleMessage(msg.data);
+                }
                 if (msg.type === 'Close') {
+                    console.warn('[VOICE] WS CLOSED, will reconnect in 3s');
                     socketRef.current = null;
                     setSignalingSender(null);
                     setIsConnected(false);
@@ -130,6 +150,7 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
 
             // Authenticate the WS so RPC calls can use the JWT identity.
             const _token = getToken();
+            console.log('[VOICE] authenticate →', _token ? `token(${_token.length}b)` : 'NO TOKEN');
             if (_token) {
                 await socket.send(JSON.stringify({ type: 'authenticate', token: _token }));
             }
@@ -141,14 +162,19 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
                 username: usernameRef.current,
                 ...(fingerprintRef.current ? { fingerprint: fingerprintRef.current } : {}),
             };
+            console.log('[VOICE] initial join →', _initialJoin);
             await socket.send(JSON.stringify(_initialJoin));
 
+            console.log('[VOICE] flushing queue:', signalQueueRef.current.length, 'pending');
             while (signalQueueRef.current.length > 0) {
                 const _signal = signalQueueRef.current.shift();
-                if (_signal) await socket.send(JSON.stringify(_signal));
+                if (_signal) {
+                    console.log('[VOICE] flush →', _signal);
+                    await socket.send(JSON.stringify(_signal));
+                }
             }
         } catch (err) {
-            console.error("Connection/pinning failure:", err);
+            console.error("[VOICE] Connection/pinning failure:", err);
             setIsConnected(false);
             socketRef.current = null;
             setTimeout(connectSocket, 5000);
@@ -156,7 +182,11 @@ export const VoiceProvider = ({ children }: { children: ReactNode }) => {
     }, [handleMessage, fingerprintRef]);
 
     const setUserInfo = useCallback((username: string, userId: string) => {
-        if (!username || !userId) return;
+        console.log('[VOICE] setUserInfo', { username, userId });
+        if (!username || !userId) {
+            console.warn('[VOICE] setUserInfo SKIP — empty username or userId');
+            return;
+        }
         setLocalUsername(username);
         setLocalUserId(userId);
         usernameRef.current = username;

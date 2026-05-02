@@ -56,10 +56,15 @@ export function useSfuConnection({
     }, [removeScreenTrack]);
 
     const connectSFU = useCallback(async () => {
+        console.log('[VOICE] connectSFU — creating PeerConnection');
         if (sfuConnectionRef.current) sfuConnectionRef.current.close();
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
         sfuConnectionRef.current = pc;
+
+        pc.oniceconnectionstatechange = () => console.log('[VOICE] PC ice state →', pc.iceConnectionState);
+        pc.onconnectionstatechange = () => console.log('[VOICE] PC connection state →', pc.connectionState);
+        pc.onsignalingstatechange = () => console.log('[VOICE] PC signaling state →', pc.signalingState);
 
         // Reset perfect-negotiation flags for the new PC instance.
         makingOfferRef.current = false;
@@ -67,6 +72,7 @@ export function useSfuConnection({
         isSettingRemoteAnswerPendingRef.current = false;
 
         const local = localStreamRef.current;
+        console.log('[VOICE] connectSFU local audio tracks:', local?.getAudioTracks().length ?? 0);
         if (local) local.getAudioTracks().forEach(t => pc.addTrack(t, local));
 
         const screen = screenStreamRef.current;
@@ -112,24 +118,19 @@ export function useSfuConnection({
 
         // Perfect-negotiation: drive (re)negotiation through a single guarded path.
         pc.onnegotiationneeded = async () => {
+            console.log('[VOICE] onnegotiationneeded fired');
             try {
                 makingOfferRef.current = true;
-                // Explicit createOffer + setLocalDescription(desc): the implicit
-                // form (`setLocalDescription()` with no arg) silently no-ops in
-                // some Tauri WebView builds, leaving `localDescription` null and
-                // never emitting an offer — which is exactly the "everyone is
-                // isolated, no audio flows" symptom reported on join.
                 const _offer = await pc.createOffer();
                 await pc.setLocalDescription(_offer);
-                // Wire format: send raw SDP string. The SFU's `extract_sdp`
-                // (signaling-server) reads `msg.sdp` as a string; sending the
-                // full RTCSessionDescription object would JSON-serialize to
-                // `{type, sdp}` and break parsing on the server side.
                 if (_offer.sdp) {
+                    console.log('[VOICE] sending offer (sdp size=' + _offer.sdp.length + ')');
                     sendSignal({ type: 'offer', sdp: _offer.sdp } as any);
+                } else {
+                    console.warn('[VOICE] createOffer returned empty sdp!');
                 }
             } catch (err) {
-                console.error('RTC negotiation error:', err);
+                console.error('[VOICE] RTC negotiation error:', err);
             } finally {
                 makingOfferRef.current = false;
             }
@@ -140,8 +141,10 @@ export function useSfuConnection({
     const handleMessage = useCallback(async (data: string) => {
         try {
             const msg = JSON.parse(data) as ServerSignal;
+            console.log('[VOICE] handleMessage type=' + msg.type, msg);
             switch (msg.type) {
                 case 'joined':
+                    console.log('[VOICE] JOINED channel=' + msg.channelId + ' peers=' + (msg.peers?.length ?? 0));
                     if (msg.channelId !== 'global') {
                         const peers = msg.peers.map((p: any) => ({
                             ...p, isMuted: !!p.isMuted, isDeafened: !!p.isDeafened,
@@ -303,6 +306,7 @@ export function useSfuConnection({
                     setBandwidthStats(prev => new Map(prev).set(msg.userId, msg.bandwidthBps));
                     break;
                 case 'error':
+                    console.error('[VOICE] SERVER ERROR →', msg.message);
                     setError(msg.message);
                     break;
                 case 'friend-request-received':

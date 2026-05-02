@@ -16,11 +16,21 @@ export function useChannelManager({
 }: UseChannelManagerProps) {
 
     const joinChannel = useCallback(async (nextChannelId: string, username: string) => {
-        if (!nextChannelId || nextChannelId === channelIdRef.current) return;
+        console.log('[VOICE] joinChannel called', {
+            nextChannelId,
+            username,
+            currentChannel: channelIdRef.current,
+            userId: userIdRef.current,
+        });
+        if (!nextChannelId || nextChannelId === channelIdRef.current) {
+            console.warn('[VOICE] joinChannel SKIP (empty or same channel)');
+            return;
+        }
         const _prevChannel = channelIdRef.current || 'global';
         sendSignal({ type: 'leave', channelId: _prevChannel, userId: userIdRef.current });
 
         try {
+            console.log('[VOICE] joinChannel acquiring microphone…');
             const _selectedMicId = localStorage.getItem('selectedMic');
             const _webrtcNoiseSuppression = localStorage.getItem('webrtcNoiseSuppression') !== 'false';
             const audioConstraints: MediaTrackConstraints = {
@@ -31,6 +41,7 @@ export function useChannelManager({
             if (_selectedMicId) audioConstraints.deviceId = { exact: _selectedMicId };
 
             const _rawStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+            console.log('[VOICE] joinChannel mic acquired, tracks:', _rawStream.getAudioTracks().length);
             const audioCtx = new window.AudioContext();
             const source = audioCtx.createMediaStreamSource(_rawStream);
             const destination = audioCtx.createMediaStreamDestination();
@@ -72,11 +83,19 @@ export function useChannelManager({
             setRawLocalStream(_rawStream);
             channelIdRef.current = nextChannelId;
             setChannelId(nextChannelId);
-            sendSignal({
-                type: 'join', channelId: nextChannelId, userId: userIdRef.current, username,
+            const _joinPayload = {
+                type: 'join' as const,
+                channelId: nextChannelId,
+                userId: userIdRef.current,
+                username,
                 ...(fingerprintRef.current ? { fingerprint: fingerprintRef.current } : {}),
-            });
-        } catch { setError("Microphone inaccessible"); }
+            };
+            console.log('[VOICE] joinChannel sending join →', _joinPayload);
+            sendSignal(_joinPayload);
+        } catch (err) {
+            console.error('[VOICE] joinChannel FAILED:', err);
+            setError("Microphone inaccessible");
+        }
     }, [sendSignal, smartGateEnabled, vadThreshold, vadAuto, channelIdRef, userIdRef, fingerprintRef, noiseGateNodeRef, rawMicVolumeRef, localStreamRef, localAudioCtxRef, setLocalStream, setRawLocalStream, setChannelId, setError]);
 
     const leaveChannel = useCallback(() => {
