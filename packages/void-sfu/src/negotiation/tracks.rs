@@ -184,10 +184,7 @@ async fn attach_destinations_to_existing_members(
             // See the matching comment in catchup.rs: `add_track` would
             // silently reuse a recvonly transceiver in webrtc-rs and emit a
             // renegotiation offer without the new m-line, isolating peers.
-            warn!(
-                "add_transceiver_from_track to {} failed: {:?}",
-                member, e
-            );
+            warn!("add_transceiver_from_track to {} failed: {:?}", member, e);
             continue;
         }
 
