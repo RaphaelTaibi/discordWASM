@@ -152,7 +152,7 @@ jobs:
             SMTP_AUTH_PASSWORD="${{ secrets.SMTP_AUTH_PASSWORD }}"
             SLACK_WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
             GF_ADMIN_PASSWORD="${{ secrets.GF_ADMIN_PASSWORD }}"
-            PUBLIC_IP="${{ secrets.ORACLE_HOST }}"
+            PUBLIC_IP="${{ secrets.PUBLIC_IP }}"
             ENVEOF
             chmod 600 .env
 
