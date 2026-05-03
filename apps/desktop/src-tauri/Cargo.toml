@@ -29,6 +29,7 @@ serde_json = "1"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
 rustls = { version = "0.23", features = ["ring"] }
 rustls-pki-types = "1.14.0"
+x509-parser = "0.16"
 
 # Cryptographie
 sha2 = "0.10"
