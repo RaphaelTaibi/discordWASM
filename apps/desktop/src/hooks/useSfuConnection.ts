@@ -83,11 +83,12 @@ export function useSfuConnection({
         };
 
         pc.ontrack = (e) => {
-            if (!e.streams?.[0]) return;
-            const stream = e.streams[0];
             const track = e.track;
-            // Lookup by track id first (most reliable), fall back to stream id
-            // because the SFU's track-map references the source track id.
+            // webrtc-rs often sends tracks without associated streams;
+            // wrap the bare track in a fresh MediaStream so playback works.
+            const stream = e.streams?.[0] ?? new MediaStream([track]);
+            console.log('[VOICE] ontrack', track.kind, 'track.id=' + track.id, 'stream.id=' + stream.id, 'streams=' + e.streams.length);
+
             const uid = trackToUserMapRef.current.get(track.id)
                 || trackToUserMapRef.current.get(stream.id);
 
@@ -97,7 +98,7 @@ export function useSfuConnection({
                 return;
             }
 
-            // No mapping yet — buffer the stream and check pending track-maps
+            // No mapping yet — check pending track-maps
             const _pendingByTrack = pendingTrackMapsRef.current.get(track.id);
             const _pendingByStream = pendingTrackMapsRef.current.get(stream.id);
             const _pending = _pendingByTrack ?? _pendingByStream;
