@@ -8,7 +8,7 @@
     "dev": "vite",
     "wasm:build": "cd ../../packages/core-wasm && wasm-pack build --target web --out-dir ../../apps/desktop/src/pkg",
     "build": "tsc && vite build",
-    "build:worklet": "tsc src/worker/noise-gate.worklet.ts --outDir public/worker --module ESNext --target ES2020 --esModuleInterop --skipLibCheck",
+    "build:worklet": "vite build --config vite.worklet.config.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "csp:inject": "node scripts/inject-csp.mjs",
