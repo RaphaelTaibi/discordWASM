@@ -22,6 +22,9 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PRIMARY_PIN_HASH: ${{ secrets.PRIMARY_PIN_HASH }}
+      BACKUP_PIN_HASH: ${{ secrets.BACKUP_PIN_HASH }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
