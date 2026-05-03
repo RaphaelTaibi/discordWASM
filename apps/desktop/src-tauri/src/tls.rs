@@ -50,7 +50,7 @@ impl ServerCertVerifier for PinningVerifier {
         let cert = x509_parser::parse_x509_certificate(end_entity.as_ref())
             .map_err(|_| Error::InvalidCertificate(rustls::CertificateError::BadEncoding))?;
 
-        let spki_bytes = cert.1.tbs_certificate.subject_p_k_i.raw;
+        let spki_bytes = cert.1.tbs_certificate.subject_pki.raw;
 
         let mut hasher = Sha256::new();
         hasher.update(spki_bytes);
