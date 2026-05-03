@@ -30,6 +30,29 @@ fn get_dsp_token() -> u32 {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Auto-grant microphone / camera / screen-capture permissions inside the
+    // embedded WebView2. Without this, the very first call to
+    // `getUserMedia({ audio: true })` from the renderer triggers a Windows
+    // permission prompt that — in WebView2 builds without a host UI for
+    // permission dialogs — is silently denied (`NotAllowedError: Permission
+    // denied`). The voice pipeline then never acquires a track, no
+    // PeerConnection is created, and the user stays alone in the channel
+    // (`sfu_active_peers=0`). This Chromium flag forces WebView2 to skip the
+    // prompt and grant media access — appropriate for a voice client where
+    // the user already opted into the desktop install.
+    //
+    // Must be set BEFORE `tauri::Builder::default()` so WebView2 picks it up
+    // when it spawns. Multi-flag friendly: prepends to any existing value.
+    #[cfg(target_os = "windows")]
+    {
+        const MEDIA_FLAGS: &str = "--use-fake-ui-for-media-stream --autoplay-policy=no-user-gesture-required";
+        let merged = match std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            Ok(existing) if !existing.is_empty() => format!("{MEDIA_FLAGS} {existing}"),
+            _ => MEDIA_FLAGS.to_string(),
+        };
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", merged);
+    }
+
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let tls_config = tls::build_rustls_config();
